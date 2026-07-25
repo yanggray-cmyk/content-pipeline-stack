@@ -49,8 +49,10 @@ USER 1001:1001
 
 # 端口: recorder 不暴露 HTTP (上游也没)
 # 健康检查: 容器内 ffmpeg / python 进程在跑 = 正常
+# 端口: recorder 不暴露 HTTP (上游也没)
+# 健康检查: 用 /proc 查 main.py 进程 (不用 pgrep/不装 psutil)
 HEALTHCHECK --interval=60s --timeout=10s --retries=3 --start-period=30s \
-    CMD pgrep -f "python.*main.py" >/dev/null || exit 1
+    CMD python -c "import os; [exit(0) for p in os.listdir('/proc') if p.isdigit() and b'main.py' in open(f'/proc/{p}/cmdline','rb').read()]; exit(1)"
 
 # Default: python main.py (跟上游 + systemd ExecStart 一致)
 # tini 转 SIGTERM 给 python 信号 handler (line 87)
