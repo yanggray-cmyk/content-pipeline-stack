@@ -1,0 +1,149 @@
+# docker-compose.yml — content-pipeline-stack (P0 Week 1)
+# 单栈编排:content-pipeline-mcp + file-service + douyin-recorder + v6-monitor
+# 4 服务,从 systemd 平滑迁移过来,跟现有 systemd 并行运行一段时间后切换
+
+services:
+
+  # ─── content-pipeline-mcp (MCP protocol layer, 17 tools) ──────────────────
+  content-pipeline-mcp:
+    build:
+      context: ./services/content-pipeline-mcp
+      dockerfile: Dockerfile
+    image: ghcr.io/main-1/content-pipeline/content-pipeline-mcp:0.1.0
+    container_name: content-pipeline-mcp
+    restart: unless-stopped
+    # NOTE: 18092 occupied by systemd unit; expose 28092 for verification
+    ports:
+      - "28092:18092"
+    environment:
+      NODE_ENV: production
+      HOST: "0.0.0.0"
+    env_file:
+      - ./.env
+    volumes:
+      # Read-only access to pipeline data dir (queue.db, transcripts, cookies)
+      - /home/main/douyin-data:/home/main/douyin-data:ro
+    deploy:
+      resources:
+        limits:
+          memory: 2G          # 跟 systemd MemoryMax=2G
+          cpus: "1.5"
+        reservations:
+          memory: 1G          # 跟 systemd MemoryHigh=1G
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://127.0.0.1:18092/health"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
+    networks:
+      - content-pipeline-net
+
+  # ─── file-service (Node.js video/file browsing + upload, 851MB RSS) ────────
+  file-service:
+    build:
+      context: ./services/file-service
+      dockerfile: Dockerfile
+    image: ghcr.io/main-1/content-pipeline/file-service:0.1.0
+    container_name: file-service
+    restart: unless-stopped
+    ports:
+      - "18098:18098"
+    environment:
+      NODE_ENV: production
+      PORT: "18098"
+      FS_DATA_ROOT: /home/main/douyin-data/files
+    env_file:
+      - ./.env
+    volumes:
+      - /home/main/douyin-data:/home/main/douyin-data
+    deploy:
+      resources:
+        limits:
+          memory: 1G
+          cpus: "1.0"
+    networks:
+      - content-pipeline-net
+    depends_on:
+      - content-pipeline-mcp
+
+  # ─── douyin-recorder (Douyin live stream recorder via ffmpeg) ───────────────
+  # TODO Day 1.2.3 — uses upstream Dockerfile + local config.ini overrides
+  douyin-recorder:
+    image: ghcr.io/main-1/content-pipeline/douyin-recorder:0.1.0
+    build:
+      context: /home/main/DouyinLiveRecorder
+      dockerfile: Dockerfile
+    container_name: douyin-recorder
+    restart: unless-stopped
+    ports:
+      - "18988:18988"           # BFF dashboard port
+    environment:
+      TZ: Asia/Shanghai
+      # Auto-restart hook for new recordings → trigger transcribe (wraps hk-asr)
+      TRANSCRIBE_HOOK_ENABLED: "true"
+      TRANSCRIBE_HOOK_SCRIPT: /hooks/transcribe-hook-wrapper.sh
+      MCP_URL: http://content-pipeline-mcp:18092/mcp
+    env_file:
+      - ./.env
+    volumes:
+      # Streaming output
+      - /home/main/DouyinLiveRecorder/downloads:/app/downloads
+      # Config (URL_config.ini + config.ini)
+      - /home/main/douyin-data/config/douyin-recorder:/app/config:ro
+      # Transcribe hook script
+      - /home/main/douyin-data/scripts/hooks:/hooks:ro
+    deploy:
+      resources:
+        limits:
+          memory: 1.5G         # Chromium browser + ffmpeg (铁律 168)
+    networks:
+      - content-pipeline-net
+    depends_on:
+      - content-pipeline-mcp
+
+  # ─── v6-monitor (抖音账号监控 daemon, 6h 间隔) ─────────────────────────────
+  # TODO Day 1.2.4 — replaces SIGUSR1 signal handler with /api/run-now HTTP
+  v6-monitor:
+    build:
+      context: ./services/v6-monitor
+      dockerfile: Dockerfile
+    image: ghcr.io/main-1/content-pipeline/v6-monitor:0.1.0
+    container_name: v6-monitor
+    restart: unless-stopped
+    ports:
+      - "18199:18199"           # 新 HTTP API (replaces SIGUSR1)
+    environment:
+      V6_WORKDIR: /home/main/douyin-data
+      MONITOR_INTERVAL_HOURS: "6"
+      MCP_URL: http://content-pipeline-mcp:18092/mcp
+      DOUYIN_COOKIE_PATH: /home/main/douyin-data/config/cookies
+      TZ: Asia/Shanghai
+    env_file:
+      - ./.env
+    volumes:
+      - /home/main/douyin-data:/home/main/douyin-data
+    deploy:
+      resources:
+        limits:
+          memory: 200M         # 跟 systemd MemoryMax=200M
+          cpus: "0.5"
+    networks:
+      - content-pipeline-net
+    depends_on:
+      - content-pipeline-mcp
+
+# ─── Networks ─────────────────────────────────────────────────────────────────
+networks:
+  content-pipeline-net:
+    name: content-pipeline-net
+    driver: bridge
+
+# ─── Volumes (持久化数据) ─────────────────────────────────────────────────────
+# SQLite queue.db 跨 worker 共享走 host volume (不做 named volume)
+volumes: {}

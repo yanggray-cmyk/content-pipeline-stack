@@ -1,0 +1,612 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>📦 siqing.cn 视频素材库 · v8.119.40+ ae</title>
+<style>
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC", sans-serif; background: #0f0f1e; color: #e8e8f0; min-height: 100vh; }
+.container { max-width: 1400px; margin: 0 auto; padding: 20px; }
+.header { display: flex; justify-content: space-between; align-items: center; padding: 16px 20px; background: linear-gradient(135deg, #1a1a3e, #2a2a5e); border-radius: 12px; margin-bottom: 20px; border: 1px solid #3a3a6e; }
+.header h1 { font-size: 22px; color: #fff; }
+.header .nav-links a { color: #8be9fd; text-decoration: none; margin-left: 16px; padding: 6px 12px; border-radius: 6px; background: rgba(139, 233, 253, 0.1); transition: all 0.2s; }
+.header .nav-links a:hover { background: rgba(139, 233, 253, 0.2); }
+
+/* 顶部主 tab 导航 (v8.119.40+ ae) */
+.main-tabs { display: flex; gap: 8px; margin-bottom: 20px; }
+.main-tab { flex: 1; padding: 14px 24px; background: #1a1a2e; border: 1px solid #2a2a4e; color: #cfcfdc; border-radius: 10px; cursor: pointer; transition: all 0.25s; font-size: 16px; font-weight: 600; text-align: center; }
+.main-tab:hover { background: #2a2a4e; border-color: #44475a; }
+.main-tab.active { background: linear-gradient(135deg, #44475a, #6272a4); border-color: #6272a4; color: #f8f8f2; box-shadow: 0 4px 16px rgba(98, 114, 164, 0.4); }
+.main-tab .sub { font-size: 12px; font-weight: 400; opacity: 0.7; margin-top: 2px; }
+
+.layout { display: grid; grid-template-columns: 260px 1fr; gap: 20px; }
+.sidebar { background: #1a1a2e; padding: 16px; border-radius: 12px; border: 1px solid #2a2a4e; height: fit-content; position: sticky; top: 20px; }
+.sidebar h3 { color: #8be9fd; font-size: 14px; margin: 16px 0 8px 0; text-transform: uppercase; letter-spacing: 1px; }
+.sidebar h3:first-child { margin-top: 0; }
+.type-btn { display: flex; justify-content: space-between; align-items: center; width: 100%; padding: 10px 12px; margin-bottom: 4px; background: transparent; border: 1px solid transparent; color: #cfcfdc; border-radius: 8px; cursor: pointer; transition: all 0.2s; font-size: 14px; }
+.type-btn:hover { background: #2a2a4e; }
+.type-btn.active { background: #44475a; border-color: #6272a4; color: #f8f8f2; }
+.type-btn .count { background: #44475a; padding: 2px 8px; border-radius: 10px; font-size: 12px; }
+.tag-cloud { display: flex; flex-wrap: wrap; gap: 6px; }
+.tag-cloud .tag { padding: 4px 10px; background: #2a2a4e; border-radius: 12px; font-size: 12px; cursor: pointer; transition: all 0.2s; }
+.tag-cloud .tag:hover { background: #44475a; color: #8be9fd; }
+.tag-cloud .tag.active { background: #6272a4; color: #f8f8f2; }
+.sidebar .info { font-size: 12px; color: #6272a4; line-height: 1.6; padding: 12px; background: #0f0f1e; border-radius: 8px; margin-top: 8px; }
+.sidebar .info code { background: #2a2a4e; padding: 2px 6px; border-radius: 4px; color: #50fa7b; font-size: 11px; }
+.main { background: #1a1a2e; padding: 20px; border-radius: 12px; border: 1px solid #2a2a4e; }
+.toolbar { display: flex; gap: 12px; margin-bottom: 16px; flex-wrap: wrap; }
+.search-input { flex: 1; min-width: 200px; padding: 10px 14px; background: #0f0f1e; border: 1px solid #44475a; border-radius: 8px; color: #f8f8f2; font-size: 14px; }
+.search-input:focus { outline: none; border-color: #8be9fd; }
+.sort-select { padding: 10px 14px; background: #0f0f1e; border: 1px solid #44475a; border-radius: 8px; color: #f8f8f2; font-size: 14px; cursor: pointer; }
+.summary-bar { display: flex; justify-content: space-between; padding: 10px 14px; background: #0f0f1e; border-radius: 8px; margin-bottom: 16px; font-size: 13px; color: #8be9fd; }
+.video-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(320px, 1fr)); gap: 16px; }
+.video-card { background: #0f0f1e; border: 1px solid #2a2a4e; border-radius: 10px; overflow: hidden; transition: all 0.2s; cursor: pointer; }
+.video-card:hover { border-color: #8be9fd; transform: translateY(-2px); box-shadow: 0 4px 20px rgba(139, 233, 253, 0.2); }
+.video-card .preview { width: 100%; aspect-ratio: 16/9; background: #000; display: flex; align-items: center; justify-content: center; overflow: hidden; position: relative; }
+.video-card .preview video { width: 100%; height: 100%; object-fit: cover; position: relative; z-index: 1; }
+.video-card .preview video:not([data-loaded]) { opacity: 0; }
+.video-card .preview .icon { font-size: 64px; opacity: 0.4; position: absolute; z-index: 0; }
+.video-card .preview .skeleton { position: absolute; inset: 0; background: linear-gradient(90deg, #1a1a2e 0%, #2a2a4e 50%, #1a1a2e 100%); background-size: 200% 100%; animation: shimmer 1.5s infinite; z-index: 0; }
+@keyframes shimmer { 0% { background-position: 200% 0; } 100% { background-position: -200% 0; } }
+.video-card .preview.error .skeleton { display: none; }
+.retry-btn { padding: 8px 16px; background: #44475a; color: #f8f8f2; border: 1px solid #6272a4; border-radius: 6px; cursor: pointer; font-size: 13px; margin-top: 12px; transition: all 0.2s; }
+.retry-btn:hover { background: #6272a4; }
+.video-card .info { padding: 12px; }
+.video-card .name { font-size: 14px; font-weight: 600; color: #f8f8f2; margin-bottom: 6px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.video-card .meta { font-size: 12px; color: #6272a4; margin-bottom: 8px; }
+.video-card .tags { display: flex; flex-wrap: wrap; gap: 4px; }
+.video-card .tag { padding: 2px 8px; background: #2a2a4e; border-radius: 8px; font-size: 10px; color: #cfcfdc; }
+/* v8.119.40+ dl-fix: 作者 + aweme_id 行 */
+.meta-row { display: flex; align-items: center; gap: 6px; margin-bottom: 4px; }
+.author-badge { display: inline-block; padding: 3px 10px; background: #44475a; border: 1px solid #6272a4; color: #f8f8f2; border-radius: 12px; font-size: 11px; cursor: pointer; transition: all 0.2s; font-weight: 600; }
+.author-badge:hover { background: #6272a4; border-color: #8be9fd; transform: scale(1.05); }
+.author-badge.muted { background: #2a2a4e; color: #6272a4; cursor: default; border-color: #44475a; }
+.aweme-id { font-size: 10px; color: #6272a4; margin-bottom: 4px; font-family: 'Courier New', monospace; }
+.aweme-id code { background: #0f0f1e; padding: 1px 6px; border-radius: 4px; color: #50fa7b; font-size: 10px; }
+.aweme-id.missing { color: #ff5555; font-style: italic; }
+.aweme-id.missing::before { content: '⚠️ '; }
+.video-card .actions { display: flex; gap: 4px; padding: 0 12px 12px; }
+.video-card .actions button { flex: 1; padding: 6px; background: #2a2a4e; border: none; color: #cfcfdc; border-radius: 6px; cursor: pointer; font-size: 12px; transition: all 0.2s; }
+.video-card .actions button:hover { background: #44475a; color: #8be9fd; }
+.empty, .loading { text-align: center; padding: 60px 20px; color: #6272a4; }
+.toast { position: fixed; bottom: 20px; right: 20px; padding: 12px 20px; background: #44475a; color: #f8f8f2; border-radius: 8px; opacity: 0; transition: opacity 0.3s; z-index: 1000; }
+.toast.show { opacity: 1; }
+.toast.error { background: #ff5555; }
+.toast.success { background: #50fa7b; color: #282a36; }
+</style>
+</head>
+<body>
+<div class="container">
+  <div class="header">
+    <h1>📦 siqing.cn 视频素材库</h1>
+    <div class="nav-links">
+      <a href="/files">📂 文件管理</a>
+      <a href="/davinci/">🎞️ DaVinci</a>
+      <a href="/">🏠 首页</a>
+    </div>
+  </div>
+
+  <!-- v8.119.40+ ae: 两大主 tab -->
+  <div class="main-tabs">
+    <button class="main-tab active" id="tab-library" onclick="switchMainTab('library')">
+      📦 素材库
+      <div class="sub">品牌素材 · 抖音 · B站</div>
+    </button>
+    <button class="main-tab" id="tab-davinci" onclick="switchMainTab('davinci')">
+      🎨 da-vinci
+      <div class="sub">一婶是Ethan 达芬奇教程系列</div>
+    </button>
+  </div>
+
+  <div class="layout">
+    <aside class="sidebar">
+      <h3>📁 文件类型</h3>
+      <button class="type-btn active" data-type="video">🎬 视频 <span class="count" id="count-video">-</span></button>
+      <button class="type-btn" data-type="transcript">📝 转录/字幕 <span class="count" id="count-transcript">-</span></button>
+      <button class="type-btn" data-type="subtitle">💬 字幕 <span class="count" id="count-subtitle">-</span></button>
+
+      <h3>👤 作者 (v8.119.40+ dl-fix)</h3>
+      <button class="type-btn active" data-author="" id="author-btn-all">📦 全部 <span class="count" id="count-author-all">-</span></button>
+      <div id="author-cloud"><div class="loading" style="font-size:12px">加载中...</div></div>
+
+      <h3 id="tag-title">🏷️ 标签</h3>
+      <div class="tag-cloud" id="tag-cloud"><div class="loading" style="font-size:12px">加载中...</div></div>
+
+      <h3>ℹ️ 说明</h3>
+      <div class="info">
+        <strong style="color:#8be9fd">📦 素材库</strong> — 全部视频文件<br>
+        <strong style="color:#8be9fd">🎨 da-vinci</strong> — 一婶是Ethan 达芬奇调色教程<br>
+        <hr style="border-color:#2a2a4e;margin:8px 0">
+        点击文件预览 · 点击标签筛选<br>
+        数据源：<code>GET /f/files</code>
+      </div>
+    </aside>
+
+    <main class="main">
+      <div class="toolbar">
+        <input type="text" class="search-input" id="search-input" placeholder="🔍 按文件名/标签搜索...">
+        <select class="sort-select" id="sort-select">
+          <option value="newest">⬇️ 最新优先</option>
+          <option value="oldest">⬆️ 最旧优先</option>
+          <option value="largest">📦 最大优先</option>
+          <option value="smallest">📄 最小优先</option>
+          <option value="name">🔤 名称 A→Z</option>
+        </select>
+      </div>
+
+      <div class="summary-bar">
+        <span>共 <strong id="result-count">0</strong> 个文件</span>
+        <span id="result-type">📦 素材库 · 视频</span>
+      </div>
+
+      <div class="video-grid" id="video-grid"><div class="loading">加载中...</div></div>
+    </main>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+const API = '/f';
+
+// v8.119.40+ ae: 两主 tab
+// library: type=video, 显示全部视频文件 (默认 tab)
+// davinci: type=video, category=brand-video, tags=da-vinci
+let currentTab = 'library'; // 'library' | 'davinci'
+let currentType = 'video';
+let currentTag = '';
+let currentAuthor = '';  // v8.119.40+ dl-fix
+let currentSearch = '';
+let currentSort = 'newest';
+let allFiles = [];
+
+// 切主 tab
+function switchMainTab(tab) {
+  document.querySelectorAll('.main-tab').forEach(b => b.classList.remove('active'));
+  document.getElementById('tab-' + tab).classList.add('active');
+  currentTab = tab;
+  currentTag = ''; // 切 tab 清 tag 筛选
+  currentAuthor = ''; // 切 tab 清作者筛选
+  document.getElementById('author-btn-all').classList.add('active');
+  loadCounts();
+  loadFiles();
+  loadTagCloud();
+  loadAuthorCloud();
+}
+
+// v8.119.40+ dl-fix: 作者过滤 — 作者 badge 点击调用
+function filterByAuthor(author) {
+  currentAuthor = currentAuthor === author ? '' : author;
+  document.querySelectorAll('#author-cloud .type-btn').forEach(el => {
+    el.classList.toggle('active', el.dataset.author === currentAuthor);
+  });
+  document.getElementById('author-btn-all').classList.toggle('active', currentAuthor === '');
+  renderFiles();
+}
+
+// v8.119.40+ dl-fix: 作者云 (从当前可见 files 里统计 Top 作者)
+async function loadAuthorCloud() {
+  const cloud = document.getElementById('author-cloud');
+  try {
+    const params = new URLSearchParams();
+    if (currentTab === 'davinci') {
+      params.set('type', 'video');
+      params.set('category', 'brand-video');
+      params.set('tags', 'da-vinci');
+    } else {
+      params.set('type', currentType);
+    }
+    params.set('limit', '500');
+    const d = await fetchJSON(API + '/files?' + params.toString(), { maxRetries: 1 });
+    const files = d.files || [];
+    const counts = {};
+    for (const f of files) {
+      const cm = f.customMeta || {};
+      const a = cm.author;
+      if (a && !cm.author_placeholder) counts[a] = (counts[a] || 0) + 1;
+    }
+    const sorted = Object.entries(counts).sort((a, b) => b[1] - a[1]).slice(0, 10);
+    document.getElementById('count-author-all').textContent = files.length;
+    if (!sorted.length) {
+      cloud.innerHTML = '<div style="font-size:11px;color:#6272a4">无可识别的作者</div>';
+      return;
+    }
+    cloud.innerHTML = sorted.map(([author, c]) =>
+      `<button class="type-btn ${currentAuthor === author ? 'active' : ''}" data-author="${escapeHtml(author)}" onclick="filterByAuthor('${escapeHtml(author)}')">👤 ${escapeHtml(author)} <span class="count">${c}</span></button>`
+    ).join('');
+  } catch(e) {
+    cloud.innerHTML = '<div style="font-size:11px;color:#ff5555">作者云加载失败</div>';
+  }
+}
+
+// 加载左侧计数 (v8.119.40+ az: 并发 + abort + retry)
+let loadCountsCtrl = null;
+async function loadCounts() {
+  if (loadCountsCtrl) loadCountsCtrl.abort();
+  loadCountsCtrl = new AbortController();
+  const sig = loadCountsCtrl.signal;
+  const types = ['video', 'transcript', 'subtitle'];
+  await Promise.all(types.map(async t => {
+    try {
+      const d = await fetchJSON(API + '/files?type=' + t, { signal: sig, maxRetries: 1 });
+      const el = document.getElementById('count-' + t);
+      if (el) el.textContent = d.count || 0;
+    } catch(e) { /* 静默: 计数失败不影响主列表 */ }
+  }));
+}
+
+// 加载标签云 (随主 tab 变化)  v8.119.40+ az: abort
+let loadTagCloudCtrl = null;
+async function loadTagCloud() {
+  if (loadTagCloudCtrl) loadTagCloudCtrl.abort();
+  loadTagCloudCtrl = new AbortController();
+  try {
+    let url;
+    if (currentTab === 'davinci') {
+      url = API + '/files?type=video&category=brand-video&tags=da-vinci&limit=500';
+    } else {
+      url = API + '/files?type=video&limit=500';
+    }
+    const d = await fetchJSON(url, { signal: loadTagCloudCtrl.signal, maxRetries: 1 });
+    if (!d.ok) return;
+    const counts = {};
+    (d.files || []).forEach(f => (f.tags || []).forEach(t => { if (t) counts[t] = (counts[t] || 0) + 1; }));
+    const sorted = Object.entries(counts).sort((a, b) => b[1] - a[1]).slice(0, 25);
+    const cloud = document.getElementById('tag-cloud');
+    const tagTitle = document.getElementById('tag-title');
+    if (currentTab === 'davinci') {
+      tagTitle.textContent = '🏷️ 达芬奇标签';
+    } else {
+      tagTitle.textContent = '🏷️ 标签';
+    }
+    cloud.innerHTML = sorted.length
+      ? sorted.map(([t, c]) => `<span class="tag${t === currentTag ? ' active' : ''}" data-tag="${t.replace(/"/g, '&quot;')}">${escapeHtml(t)} ${c}</span>`).join('')
+      : '<div style="font-size:12px;color:#6272a4">无标签</div>';
+    cloud.querySelectorAll('.tag').forEach(el => {
+      el.onclick = () => {
+        currentTag = currentTag === el.dataset.tag ? '' : el.dataset.tag;
+        loadFiles();
+        loadTagCloud();
+      };
+    });
+  } catch(e) {}
+}
+
+// 加载文件列表 (v8.119.40+ az: abort + retry + 错误重试 UI)
+let loadFilesCtrl = null;
+async function loadFiles() {
+  // 取消上一次未完成的请求,避免 race condition
+  if (loadFilesCtrl) loadFilesCtrl.abort();
+  loadFilesCtrl = new AbortController();
+
+  const grid = document.getElementById('video-grid');
+  if (!allFiles.length) {
+    grid.innerHTML = '<div class="loading">⏳ 加载中...</div>';
+  }
+  try {
+    const params = new URLSearchParams();
+    if (currentTab === 'davinci') {
+      params.set('type', 'video');
+      params.set('category', 'brand-video');
+      params.set('tags', 'da-vinci');
+    } else {
+      params.set('type', currentType);
+    }
+    if (currentTag) params.set('tags', currentTag);
+    if (currentSearch) params.set('search', currentSearch);
+    const url = API + '/files?' + params.toString();
+    const d = await fetchJSON(url, { signal: loadFilesCtrl.signal, maxRetries: 2 });
+    if (!d.ok) throw new Error('API 返回失败');
+    allFiles = d.files || [];
+    renderFiles();
+  } catch(e) {
+    if (e.name === 'AbortError') return; // 被新请求取代,静默
+    grid.innerHTML = `<div class="empty">❌ 加载失败: ${escapeHtml(e.message)}<br><button class="retry-btn" onclick="loadFiles()">🔄 重试</button></div>`;
+    toast('加载失败: ' + e.message, 'error');
+  }
+}
+
+// v8.119.40+ dv: 显示名 fallback chain — 真实中文标题优先 (修复 douyin-{aweme_id} 数字名问题)
+function displayName(f) {
+  const cm = f.customMeta || {};
+  if (cm.title && cm.title.trim()) return cm.title.trim();
+  // cm.description 偶尔是完整话题串, 超过 80 字符的视为 hashtag 串不作为显示名
+  if (cm.description && cm.description.trim() && cm.description.length <= 80) return cm.description.trim();
+  // 兜底: 去掉 douyin-{aweme_id} 前缀 + 文件扩展名
+  const orig = f.originalName || f.filename || '';
+  const stripped = orig.replace(/^douyin-\d+(?:[-_](?=[^.]))?/, '').replace(/\.[^.]+$/, '');
+  // 如果剥离后只是纯字母扩展名 (如 mp4/srt/md) 或空, 用 aweme_id 作为最后兑底
+  const isJustExt = !stripped || (/^[a-z0-9]{1,5}$/i.test(stripped) && /^[a-z]+$/i.test(stripped));
+  if (!isJustExt) return stripped;
+  if (cm.aweme_id || cm.video_id) return 'douyin-' + (cm.aweme_id || cm.video_id);
+  return orig || '(无标题)';
+}
+
+function renderFiles() {
+  let files = [...allFiles];
+  // v8.119.40+ dl-fix: 按作者过滤 (客户接 author badge)
+  if (currentAuthor) {
+    files = files.filter(f => {
+      const cm = f.customMeta || {};
+      return cm.author === currentAuthor && !cm.author_placeholder;
+    });
+  }
+  if (currentSearch) {
+    const s = currentSearch.toLowerCase();
+    files = files.filter(f =>
+      displayName(f).toLowerCase().includes(s) ||
+      (f.originalName || '').toLowerCase().includes(s) ||
+      (f.tags || []).some(t => t.toLowerCase().includes(s)) ||
+      (f.description || '').toLowerCase().includes(s)
+    );
+  }
+  switch (currentSort) {
+    case 'newest': files.sort((a, b) => (b.uploadedAt || 0) - (a.uploadedAt || 0)); break;
+    case 'oldest': files.sort((a, b) => (a.uploadedAt || 0) - (b.uploadedAt || 0)); break;
+    case 'largest': files.sort((a, b) => (b.size || 0) - (a.size || 0)); break;
+    case 'smallest': files.sort((a, b) => (a.size || 0) - (b.size || 0)); break;
+    case 'name': files.sort((a, b) => displayName(a).localeCompare(displayName(b))); break;
+  }
+  document.getElementById('result-count').textContent = files.length;
+  const tabLabel = currentTab === 'davinci' ? '🎨 da-vinci' : '📦 素材库';
+  const typeLabel = currentType || '视频';
+  const tagLabel = currentTag ? ' · 🏷️ ' + currentTag : '';
+  document.getElementById('result-type').textContent = tabLabel + ' · ' + typeLabel + tagLabel;
+
+  const grid = document.getElementById('video-grid');
+  if (!files.length) {
+    grid.innerHTML = '<div class="empty">暂无文件</div>';
+    return;
+  }
+  grid.innerHTML = files.map(f => {
+    const tags = f.tags || [];
+    const tagsHtml = tags.length
+      ? tags.slice(0, 5).map(t => `<span class="tag">${escapeHtml(t)}</span>`).join('') + (tags.length > 5 ? `<span class="tag">+${tags.length - 5}</span>` : '')
+      : '';
+    const isVideo = (f.mimeType || '').startsWith('video/');
+    const preview = isVideo
+      ? `<div class="preview" data-preview><span class="skeleton"></span><video data-id="${f.id}" muted preload="none" playsinline></video></div>`
+      : `<div class="preview"><span class="icon">📄</span></div>`;
+    // v8.119.40+ dl-fix: 作者 + aweme_id (跨 batch 唯一标识) + douyin_url
+    const cm = f.customMeta || {};
+    const author = cm.author && !cm.author_placeholder ? cm.author : null;
+    const awemeId = cm.aweme_id || cm.video_id || null;
+    const douyinUrl = cm.douyin_url || (awemeId ? `https://www.douyin.com/video/${awemeId}` : null);
+    const authorBadge = author
+      ? `<span class="author-badge" data-author="${escapeHtml(author)}" title="点击只看 ${escapeHtml(author)} 的视频" onclick="event.stopPropagation();filterByAuthor('${escapeHtml(author)}')">👤 ${escapeHtml(author)}</span>`
+      : `<span class="author-badge muted" title="无作者元数据">👤 ?</span>`;
+    const awemeLine = awemeId
+      ? `<div class="aweme-id" title="${escapeHtml(douyinUrl || '')}">aweme_id: <code>${escapeHtml(awemeId)}</code></div>`
+      : `<div class="aweme-id missing" title="缺唯一 ID — 见铁律 63 v2">aweme_id: 缺失</div>`;
+    return `
+      <div class="video-card" onclick="previewFile('${f.id}')">
+        ${preview}
+        <div class="info">
+          <div class="name" title="${escapeHtml(displayName(f))}">${escapeHtml(displayName(f))}</div>
+          <div class="meta-row">${authorBadge}</div>
+          ${awemeLine}
+          <div class="meta">${fmtSize(f.size)} · ${fmtTime(f.uploadedAt)}</div>
+          <div class="tags">${tagsHtml}</div>
+        </div>
+        <div class="actions">
+          <button onclick="event.stopPropagation();downloadFile('${f.id}')">⬇️ 下载</button>
+          <button onclick="event.stopPropagation();downloadTranscript('${f.id}')" id="btn-md-${f.id}" title="查找并下载关联的转录 .md">📝 .md</button>
+          <button onclick="event.stopPropagation();copyId('${f.id}')">📋 ID</button>
+        </div>
+      </div>`;
+  }).join('');
+  bindVideoPreviews();  // v8.119.40+ az: 绑定 hover 预览 (lazy-load + single-player)
+}
+
+function previewFile(id) { window.open(API + '/preview/' + id, '_blank'); }
+function downloadFile(id) { window.location.href = API + '/download/' + id; }
+function copyId(id) {
+  navigator.clipboard.writeText(id).then(() => toast('ID 已复制', 'success')).catch(() => toast('复制失败', 'error'));
+}
+
+function escapeHtml(s) {
+  if (!s) return '';
+  return String(s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+}
+function fmtSize(b) {
+  if (!b) return '0 B';
+  if (b < 1048576) return (b / 1024).toFixed(1) + ' KB';
+  if (b < 1073741824) return (b / 1048576).toFixed(1) + ' MB';
+  return (b / 1073741824).toFixed(2) + ' GB';
+}
+function fmtTime(ts) {
+  if (!ts) return '';
+  const d = new Date(ts);
+  const p = n => String(n).padStart(2, '0');
+  return `${d.getMonth() + 1}/${d.getDate()} ${p(d.getHours())}:${p(d.getMinutes())}`;
+}
+function toast(msg, type='') {
+  const t = document.getElementById('toast');
+  t.textContent = msg;
+  t.className = 'toast show ' + type;
+  setTimeout(() => t.classList.remove('show'), 2500);
+}
+
+// 左侧 type 切换
+document.querySelectorAll('.type-btn').forEach(btn => {
+  btn.onclick = () => {
+    document.querySelectorAll('.type-btn').forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+    currentType = btn.dataset.type;
+    loadFiles();
+  };
+});
+
+document.getElementById('search-input').oninput = e => {
+  currentSearch = e.target.value;
+  renderFiles();
+};
+document.getElementById('sort-select').onchange = e => {
+  currentSort = e.target.value;
+  renderFiles();
+};
+
+// v8.119.40+ au: 转录 .md 关联查找
+// 缓存 douyin-transcribe + transcript 类型文件
+let transcriptCache = null;
+let transcriptCacheAt = 0;
+
+async function loadTranscriptCache() {
+  const now = Date.now();
+  if (transcriptCache && now - transcriptCacheAt < 60000) return transcriptCache;
+  // 取 transcript 类型 + douyin-transcribe category (含 .md/.srt)
+  try {
+    const [r1, r2] = await Promise.all([
+      fetchJSON(API + '/files?type=transcript&limit=500', { maxRetries: 1 }),
+      fetchJSON(API + '/files?category=douyin-transcribe&limit=500', { maxRetries: 1 }),
+    ]);
+    const seen = new Set();
+    const merged = [];
+    for (const f of (r1.files || []).concat(r2.files || [])) {
+      if (!seen.has(f.id)) { seen.add(f.id); merged.push(f); }
+    }
+    transcriptCache = merged;
+    transcriptCacheAt = now;
+    return merged;
+  } catch (e) {
+    return [];
+  }
+}
+
+// 给 video 文件找最匹配的转录文件 (.md 优先)
+// 匹配策略 (按权重):
+//   1. filename 同前缀 (凯将军-xxx.mp4 → 凯将军-xxx.md)  [weight 100]
+//   2. tags 交集数 (取 max)                              [weight = 交集数]
+//   3. uploadedAt ±5min 内同 session                     [weight = 10 - 分钟差]
+function findTranscript(videoFile) {
+  if (!transcriptCache || !transcriptCache.length) return null;
+  const videoName = (videoFile.originalName || '').replace(/\.[^.]+$/, '');
+  const videoTags = new Set(videoFile.tags || []);
+  const videoTime = videoFile.uploadedAt || 0;
+
+  let best = null;
+  let bestScore = 0;
+  for (const t of transcriptCache) {
+    if (!t.filename || !t.filename.match(/\.md$|\.srt$/i)) continue;
+    let score = 0;
+    // 1. filename 前缀匹配
+    const tName = (t.originalName || '').replace(/\.[^.]+$/, '');
+    if (videoName && tName && (videoName.includes(tName) || tName.includes(videoName))) {
+      score += 100;
+    }
+    // 2. tags 交集
+    const tTags = new Set(t.tags || []);
+    let intersect = 0;
+    for (const tag of videoTags) if (tTags.has(tag)) intersect++;
+    score += intersect * 5;
+    // 3. 时间窗口
+    if (videoTime && t.uploadedAt) {
+      const diff = Math.abs(videoTime - t.uploadedAt);
+      if (diff < 5 * 60 * 1000) score += 50 - Math.floor(diff / 60000);
+    }
+    // 4. category 偏好
+    if (t.category === 'douyin-transcribe') score += 3;
+    // .md 优先
+    if (t.filename.endsWith('.md')) score += 1;
+    if (score > bestScore) { bestScore = score; best = t; }
+  }
+  return bestScore >= 5 ? best : null;
+}
+
+async function downloadTranscript(videoId) {
+  const videoFile = allFiles.find(f => f.id === videoId);
+  if (!videoFile) { toast('视频信息丢失，请刷新', 'error'); return; }
+  // 加载/刷新 transcript cache
+  await loadTranscriptCache();
+  const md = findTranscript(videoFile);
+  if (!md) {
+    toast('该视频暂无转录 .md (未跑过 douyin-transcribe)', 'error');
+    return;
+  }
+  // 找到 → 下载
+  window.location.href = API + '/download/' + md.id;
+  toast('已下载: ' + md.originalName, 'success');
+}
+
+// v8.119.40+ az: fetchJSON — abort + retry + timeout
+async function fetchJSON(url, opts = {}) {
+  const { maxRetries = 2, timeoutMs = 10000, signal } = opts;
+  let lastErr = null;
+  for (let attempt = 0; attempt <= maxRetries; attempt++) {
+    // 每次 attempt 一个独立 ctrl (防止 timeout 后旧的 signal 干扰下次)
+    const innerCtrl = new AbortController();
+    const onOuterAbort = () => innerCtrl.abort();
+    if (signal) {
+      if (signal.aborted) throw new DOMException('Aborted', 'AbortError');
+      signal.addEventListener('abort', onOuterAbort, { once: true });
+    }
+    const timer = setTimeout(() => innerCtrl.abort(new DOMException('Timeout', 'AbortError')), timeoutMs);
+    try {
+      const r = await fetch(url, { signal: innerCtrl.signal });
+      clearTimeout(timer);
+      if (signal) signal.removeEventListener('abort', onOuterAbort);
+      if (!r.ok) throw new Error(`HTTP ${r.status}`);
+      const d = await r.json();
+      return d;
+    } catch (e) {
+      clearTimeout(timer);
+      if (signal) signal.removeEventListener('abort', onOuterAbort);
+      if (e.name === 'AbortError') throw e; // 外部 abort / timeout, 不重试
+      lastErr = e;
+      if (attempt < maxRetries) {
+        await new Promise(r => setTimeout(r, 300 * Math.pow(2, attempt))); // 300ms, 600ms, 1200ms
+      }
+    }
+  }
+  throw lastErr || new Error('fetch failed');
+}
+
+// v8.119.40+ az: bindVideoPreviews — 首次 hover 才 set src, 任意时刻只 1 个 video 播放
+function bindVideoPreviews() {
+  document.querySelectorAll('[data-preview] video[data-id]').forEach(v => {
+    if (v.dataset.bound) return; // 防重复绑定 (renderFiles 重渲染时)
+    v.dataset.bound = '1';
+    const id = v.dataset.id;
+    const src = API + '/download/' + id;
+    let loaded = false;
+    const showError = () => {
+      const wrap = v.parentElement;
+      if (wrap && !wrap.classList.contains('error')) {
+        wrap.classList.add('error');
+        const ic = document.createElement('span');
+        ic.className = 'icon';
+        ic.textContent = '🎬';
+        wrap.appendChild(ic);
+      }
+    };
+    v.addEventListener('error', showError);
+    v.addEventListener('mouseenter', () => {
+      if (!loaded) {
+        v.src = src;
+        v.load();
+        loaded = true;
+      }
+      // 暂停其他正在播放的视频 (全局只允许 1 个 play)
+      document.querySelectorAll('[data-preview] video').forEach(o => {
+        if (o !== v && !o.paused) { o.pause(); o.currentTime = 0; }
+      });
+      const p = v.play();
+      if (p && p.catch) p.catch(() => {}); // autoplay restrictions
+    });
+    v.addEventListener('mouseleave', () => {
+      v.pause();
+      v.currentTime = 0;
+    });
+    // 视频 metadata 加载完, 标记 loaded 状态 (CSS 把它从 opacity 0 渐入)
+    v.addEventListener('loadeddata', () => { v.dataset.loaded = '1'; });
+  });
+}
+
+// init
+loadCounts();
+loadFiles();
+loadTagCloud();
+</script>
+</body>
+</html>

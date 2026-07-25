@@ -1,0 +1,783 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>文件管理中心</title>
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:system-ui,-apple-system,sans-serif;background:#0f1117;color:#e2e8f0;min-height:100vh;padding:20px}
+.container{max-width:1100px;margin:0 auto}
+.header{display:flex;align-items:center;justify-content:space-between;margin-bottom:20px;flex-wrap:wrap;gap:10px}
+.header-actions{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+h1{font-size:20px;font-weight:700;color:#6366f1}
+.btn-sm{padding:6px 14px;border-radius:6px;border:1px solid #2a2d3a;background:transparent;color:#6b7280;cursor:pointer;font-size:13px}
+.btn-sm:hover{background:rgba(99,102,241,0.1);color:#e2e8f0}
+
+/* Tabs */
+.tabs{display:flex;gap:4px;background:#1a1d27;border:1px solid #2a2d3a;border-radius:10px;padding:4px;margin-bottom:20px}
+.tab{padding:8px 20px;border-radius:8px;border:none;background:transparent;color:#6b7280;cursor:pointer;font-size:14px;font-weight:500;transition:all .15s}
+.tab.active{background:#6366f1;color:#fff}
+.tab:hover:not(.active){background:rgba(99,102,241,0.1);color:#e2e8f0}
+.tab-panel{display:none}
+.tab-panel.active{display:block}
+
+/* Stats */
+.stats{display:flex;gap:16px;margin-bottom:20px;flex-wrap:wrap}
+.stat{background:#1a1d27;border:1px solid #2a2d3a;border-radius:8px;padding:12px 20px;min-width:100px}
+.stat-value{font-size:22px;font-weight:700;color:#6366f1}
+.stat-label{font-size:12px;color:#6b7280;margin-top:2px}
+
+/* Upload */
+.upload-zone{border:2px dashed #2a2d3a;border-radius:10px;padding:40px;text-align:center;cursor:pointer;transition:all .2s;margin-bottom:20px;background:#1a1d27}
+.upload-zone:hover{border-color:#6366f1;background:rgba(99,102,241,0.05)}
+.upload-zone.dragover{border-color:#6366f1;background:rgba(99,102,241,0.1)}
+.upload-zone input{display:none}
+.upload-icon{font-size:36px;margin-bottom:8px}
+.upload-text{color:#6b7280;font-size:13px}
+.upload-text strong{color:#6366f1}
+
+/* Upload Progress */
+.upload-progress{margin-bottom:20px}
+.upload-progress-item{background:#1a1d27;border:1px solid #2a2d3a;border-radius:8px;padding:12px 16px;margin-bottom:8px;display:flex;align-items:center;gap:12px}
+.upload-progress-name{flex:1;font-size:13px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.upload-progress-bar{width:200px;height:8px;background:#2a2d3a;border-radius:4px;overflow:hidden}
+.upload-progress-fill{height:100%;background:#6366f1;transition:width .2s;border-radius:4px}
+.upload-progress-pct{font-size:12px;color:#6b7280;min-width:40px;text-align:right}
+.upload-progress-status{font-size:12px;color:#22c55e}
+
+/* File grid */
+.file-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(240px,1fr));gap:14px}
+.file-card{background:#1a1d27;border:1px solid #2a2d3a;border-radius:10px;overflow:hidden;transition:border-color .2s}
+.file-card:hover{border-color:#6366f1}
+.file-preview{width:100%;height:120px;background:#0a0a0f;display:flex;align-items:center;justify-content:center;font-size:36px}
+.file-info{padding:10px 12px}
+.file-name{font-size:13px;font-weight:500;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.file-meta{font-size:11px;color:#6b7280;margin-top:4px}
+.file-tags{margin-top:6px;display:flex;flex-wrap:wrap;gap:4px}
+.tag{display:inline-block;padding:2px 7px;font-size:10px;border-radius:10px;background:rgba(96,165,250,0.18);color:#93c5fd;cursor:pointer;border:1px solid rgba(96,165,250,0.3);transition:all 0.15s}
+.tag:hover{background:rgba(96,165,250,0.35);color:#fff}
+.tag-active{background:rgba(251,191,36,0.25);color:#fcd34d;border-color:rgba(251,191,36,0.5)}
+.tag-more{background:rgba(107,114,128,0.2);color:#9ca3af;cursor:default}
+.tag-more:hover{background:rgba(107,114,128,0.2);color:#9ca3af}
+.file-desc{margin-top:6px;font-size:11px;color:#9ca3af;line-height:1.4}
+.file-actions{display:flex;gap:6px;padding:8px 12px;border-top:1px solid #2a2d3a}
+.action-btn{flex:1;padding:5px 0;border-radius:5px;border:1px solid #2a2d3a;background:transparent;color:#6b7280;cursor:pointer;font-size:11px;transition:all .15s}
+.action-btn:hover{background:rgba(99,102,241,0.1);color:#e2e8f0}
+.action-btn.danger:hover{background:rgba(239,68,68,0.1);color:#ef4444;border-color:#ef4444}
+
+/* Workspace cards */
+.ws-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:14px}
+.ws-card{background:#1a1d27;border:1px solid #2a2d3a;border-radius:10px;padding:16px;cursor:pointer;transition:all .2s}
+.ws-card:hover{border-color:#6366f1;background:rgba(99,102,241,0.05)}
+.ws-label{font-size:15px;font-weight:600;margin-bottom:6px}
+.ws-meta{font-size:12px;color:#6b7280;line-height:1.6}
+
+/* Workspace browser */
+.ws-browser{margin-top:20px}
+.ws-path{font-size:13px;color:#6b7280;margin-bottom:12px;display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+.ws-path button{background:transparent;border:1px solid #2a2d3a;color:#6b7280;padding:3px 10px;border-radius:5px;cursor:pointer;font-size:12px}
+.ws-path button:hover{background:rgba(99,102,241,0.1)}
+.ws-items{display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:10px}
+.ws-item{display:flex;align-items:center;gap:10px;padding:10px 14px;background:#1a1d27;border:1px solid #2a2d3a;border-radius:8px;cursor:pointer;font-size:13px;transition:all .15s}
+.ws-item:hover{border-color:#6366f1}
+.ws-item-icon{font-size:18px}
+.ws-item-name{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.ws-item-size{font-size:11px;color:#6b7280;margin-left:auto;white-space:nowrap}
+
+/* Toast */
+.toast{position:fixed;bottom:20px;right:20px;background:#1a1d27;border:1px solid #2a2d3a;color:#e2e8f0;padding:10px 18px;border-radius:8px;font-size:13px;z-index:2000;display:none}
+.toast.show{display:block}
+.toast.error{border-color:#ef4444;color:#ef4444}
+.toast.success{border-color:#22c55e;color:#22c55e}
+
+/* Modal */
+.modal-overlay{position:fixed;inset:0;background:rgba(0,0,0,0.75);display:flex;align-items:center;justify-content:center;z-index:1000}
+.modal-overlay.hidden{display:none}
+.modal{background:#1a1d27;border:1px solid #2a2d3a;border-radius:12px;width:90%;max-width:600px;max-height:80vh;overflow:auto}
+.modal-header{padding:14px 18px;border-bottom:1px solid #2a2d3a;display:flex;justify-content:space-between;align-items:center;font-weight:600}
+.modal-header button{background:transparent;border:none;color:#6b7280;cursor:pointer;font-size:18px}
+.modal-body{padding:18px}
+.process-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}
+.process-btn{padding:14px 8px;border-radius:8px;border:1px solid #2a2d3a;background:transparent;color:#e2e8f0;cursor:pointer;font-size:12px;transition:all .15s;text-align:center}
+.process-btn:hover{background:rgba(99,102,241,0.1);border-color:#6366f1}
+.p-icon{font-size:20px;display:block;margin-bottom:4px}
+
+/* Loading */
+.loading{text-align:center;padding:40px;color:#6b7280;font-size:14px}
+.empty{text-align:center;padding:40px;color:#6b7280;font-size:14px}
+
+/* Back button */
+.back-btn{background:transparent;border:1px solid #2a2d3a;color:#6b7280;padding:6px 12px;border-radius:6px;cursor:pointer;font-size:12px;margin-bottom:16px}
+.back-btn:hover{background:rgba(99,102,241,0.1)}
+
+/* v8.119.22: Layout with left sidebar */
+.layout{display:grid;grid-template-columns:240px 1fr;gap:20px}
+.sidebar{background:#1a1d27;padding:16px;border-radius:10px;border:1px solid #2a2d3a;height:fit-content;position:sticky;top:20px}
+.sidebar h3{color:#8b5cf6;font-size:12px;margin:14px 0 8px 0;text-transform:uppercase;letter-spacing:1px;font-weight:700}
+.sidebar h3:first-child{margin-top:0}
+.type-btn{display:flex;justify-content:space-between;align-items:center;width:100%;padding:8px 12px;margin-bottom:4px;background:transparent;border:1px solid transparent;color:#9ca3af;border-radius:6px;cursor:pointer;transition:all .15s;font-size:13px;text-align:left}
+.type-btn:hover{background:rgba(99,102,241,.15);color:#e2e8f0}
+.type-btn.active{background:rgba(99,102,241,.25);border-color:#6366f1;color:#fff;font-weight:600}
+.type-btn .count{background:#0f1117;padding:2px 8px;border-radius:10px;font-size:11px;color:#6b7280}
+.type-btn.active .count{background:#6366f1;color:#fff}
+.tag-cloud{display:flex;flex-wrap:wrap;gap:4px}
+.tag-cloud .tag{padding:3px 8px;background:#2a2d3a;border-radius:10px;font-size:11px;color:#9ca3af;cursor:pointer;transition:all .15s}
+.tag-cloud .tag:hover{background:#3a3d4a;color:#a5b4fc}
+.tag-cloud .tag.active{background:#6366f1;color:#fff}
+.nav-list{display:flex;flex-direction:column;gap:4px}
+.nav-list a{display:flex;align-items:center;gap:8px;padding:8px 12px;border-radius:6px;color:#9ca3af;text-decoration:none;font-size:13px;transition:all .15s}
+.nav-list a:hover{background:rgba(99,102,241,.15);color:#e2e8f0}
+.nav-list a.active{background:linear-gradient(135deg,#ec4899,#8b5cf6);color:#fff;font-weight:600;box-shadow:0 2px 8px rgba(236,72,153,.3)}
+.sidebar .info{font-size:11px;color:#6b7280;line-height:1.6;padding:10px;background:#0f1117;border-radius:6px;margin-top:8px}
+.sidebar .info code{background:#2a2d3a;padding:1px 5px;border-radius:4px;color:#a5b4fc;font-size:10px}
+.main{min-width:0}
+</style>
+</head>
+<body>
+<div class="container">
+
+  <div class="header">
+    <h1>📁 文件管理中心</h1>
+    <div class="header-actions">
+      <a href="/videos" class="header-link" style="background:linear-gradient(135deg,#ec4899,#8b5cf6);color:#fff;padding:8px 16px;border-radius:8px;text-decoration:none;font-weight:600;font-size:14px;display:inline-flex;align-items:center;gap:6px;box-shadow:0 2px 8px rgba(236,72,153,0.3);">🎬 视频库 /videos</a>
+      <a href="/davinci/" class="header-link" style="background:#2a2d3a;color:#e2e8f0;padding:8px 14px;border-radius:8px;text-decoration:none;font-size:13px;">🎬 DaVinci</a>
+      <a href="/" class="header-link" style="background:#2a2d3a;color:#e2e8f0;padding:8px 14px;border-radius:8px;text-decoration:none;font-size:13px;">🏠 首页</a>
+      <button class="btn-sm" onclick="loadAll()">🔄 刷新</button>
+    </div>
+  </div>
+
+  <!-- Tabs -->
+  <div class="tabs">
+    <button class="tab active" id="tab-btn-files" onclick="showTab('files')">📂 文件管理</button>
+    <button class="tab" id="tab-btn-videos" onclick="location.href='/videos'">🎬 视频库</button>
+    <button class="tab" id="tab-btn-workspaces" onclick="showTab('workspaces')">💻 工作区</button>
+  </div>
+
+  <div class="layout">
+  <aside class="sidebar">
+    <h3>📂 文件类型</h3>
+    <button class="type-btn active" id="sb-all" data-type="">📦 全部 <span class="count" id="sb-count-all">-</span></button>
+    <button class="type-btn" id="sb-video" data-type="video">🎬 视频 <span class="count" id="sb-count-video">-</span></button>
+    <button class="type-btn" id="sb-transcript" data-type="transcript">📝 转录 <span class="count" id="sb-count-transcript">-</span></button>
+    <button class="type-btn" id="sb-subtitle" data-type="subtitle">💬 字幕 <span class="count" id="sb-count-subtitle">-</span></button>
+    <button class="type-btn" id="sb-image" data-type="image">🖼️ 图片 <span class="count" id="sb-count-image">-</span></button>
+    <button class="type-btn" id="sb-audio" data-type="audio">🎵 音频 <span class="count" id="sb-count-audio">-</span></button>
+
+    <h3>🏷️ 热门标签</h3>
+    <div class="tag-cloud" id="sb-tag-cloud"><div class="loading" style="font-size:11px;padding:4px">加载中...</div></div>
+
+    <h3>🔗 快速跳转</h3>
+    <div class="nav-list">
+      <a href="/files" class="active">📂 文件管理</a>
+      <a href="/videos">🎬 视频库</a>
+      <a href="/davinci/">🎞️ DaVinci</a>
+      <a href="/">🏠 首页</a>
+    </div>
+
+    <h3>ℹ️ 说明</h3>
+    <div class="info">
+      点击类型过滤点击文件预览<br>
+      上传拖拽或点击上传区<br>
+      工作区切换需点击顶部 Tab
+    </div>
+  </aside>
+
+  <main class="main">
+
+  <!-- File Tab -->
+  <div class="tab-panel active" id="panel-files">
+    <div class="stats">
+      <div class="stat"><div class="stat-value" id="totalCount">-</div><div class="stat-label">文件数</div></div>
+      <div class="stat"><div class="stat-value" id="totalSize">-</div><div class="stat-label">总大小</div></div>
+    </div>
+    <label class="upload-zone" id="uploadZone" for="fileInput">
+      <input type="file" id="fileInput" multiple>
+      <div class="upload-icon">☁️</div>
+      <div class="upload-text">拖拽文件到此处，或 <strong>点击选择</strong><br><small>支持任意格式，单文件最大 500MB</small></div>
+    </label>
+    <!-- Upload Progress -->
+    <div class="upload-progress" id="uploadProgress" style="display:none"></div>
+    <div class="file-grid" id="fileGrid"><div class="loading">加载中...</div></div>
+  </div>
+
+  <!-- Workspaces Tab -->
+  <div class="tab-panel" id="panel-workspaces">
+    <div class="stats">
+      <div class="stat"><div class="stat-value" id="wsCount">-</div><div class="stat-label">工作区</div></div>
+      <div class="stat"><div class="stat-value" id="wsFiles">-</div><div class="stat-label">总文件</div></div>
+      <div class="stat"><div class="stat-value" id="wsTotalSize">-</div><div class="stat-label">总大小</div></div>
+    </div>
+    <div id="wsList"></div>
+    <div id="wsBrowser" class="ws-browser" style="display:none">
+      <div id="wsPathDisplay"></div>
+      <div id="wsItems"></div>
+    </div>
+  </div>
+
+  </main>
+  </div>
+
+</div>
+
+<!-- Toast -->
+<div class="toast" id="toast"></div>
+
+<!-- Process Modal -->
+<div class="modal-overlay hidden" id="processModal">
+  <div class="modal">
+    <div class="modal-header">
+      <span>选择操作</span>
+      <button onclick="closeModal()">×</button>
+    </div>
+    <div class="modal-body">
+      <div class="process-grid" id="processGrid"></div>
+    </div>
+  </div>
+</div>
+
+<script>
+const API = '/f';
+let currentTab = 'files';
+
+// ── Tab Navigation ─────────────────────────────────────────────────────
+function showTab(tab) {
+  currentTab = tab;
+  document.getElementById('tab-btn-files').classList.toggle('active', tab === 'files');
+  document.getElementById('tab-btn-workspaces').classList.toggle('active', tab === 'workspaces');
+  document.getElementById('panel-files').classList.toggle('active', tab === 'files');
+  document.getElementById('panel-workspaces').classList.toggle('active', tab === 'workspaces');
+  if (tab === 'files') loadFiles();
+  else if (tab === 'workspaces') loadWorkspaces();
+}
+
+function loadAll() {
+  if (currentTab === 'files') loadFiles();
+  else loadWorkspaces();
+}
+
+// ── Toast ─────────────────────────────────────────────────────────────
+function toast(msg, type='') {
+  const t = document.getElementById('toast');
+  t.textContent = msg;
+  t.className = 'toast show ' + type;
+  setTimeout(() => t.classList.remove('show'), 3000);
+}
+
+// ── File Management ───────────────────────────────────────────────────
+async function loadFiles() {
+  try {
+    const res = await fetch(API + '/files');
+    const d = await res.json();
+    if (!d.ok) { toast('加载失败', 'error'); return; }
+    document.getElementById('totalCount').textContent = d.count;
+    let total = 0;
+    d.files.forEach(f => total += (f.size||0));
+    document.getElementById('totalSize').textContent = fmtSize(total);
+    populateSidebar(d.files);
+    const grid = document.getElementById('fileGrid');
+    if (!d.files.length) { grid.innerHTML = '<div class="empty">暂无文件</div>'; return; }
+    grid.innerHTML = d.files.map(f => {
+      const tags = (f.tags || []);
+      const tagsHtml = tags.length
+        ? `<div class="file-tags">${tags.slice(0, 6).map(t => `<span class="tag" onclick="event.stopPropagation();filterByTag('${t.replace(/'/g, "\\'")}')">${escapeHtml(t)}</span>`).join('')}${tags.length > 6 ? `<span class="tag tag-more">+${tags.length - 6}</span>` : ''}</div>`
+        : '';
+      const descHtml = f.description ? `<div class="file-desc" title="${escapeHtml(f.description)}">${escapeHtml(f.description).slice(0, 80)}${f.description.length > 80 ? '...' : ''}</div>` : '';
+      return `
+      <div class="file-card">
+        <div class="file-preview">${getFileIcon(f.mimeType)}</div>
+        <div class="file-info">
+          <div class="file-name" title="${escapeHtml(f.originalName)}">${escapeHtml(f.originalName)}</div>
+          <div class="file-meta">${fmtSize(f.size)} · ${fmtTime(f.uploadedAt)}${f.category && f.category !== 'default' ? ' · ' + escapeHtml(f.category) : ''}</div>
+          ${tagsHtml}
+          ${descHtml}
+        </div>
+        <div class="file-actions">
+          <button class="action-btn" onclick="previewFile('${f.id}')">👁️ 预览</button>
+          <button class="action-btn" onclick="downloadFile('${f.id}')">⬇️ 下载</button>
+          ${(f.mimeType||'').startsWith('video/') ? `<button class="action-btn" onclick="downloadTranscriptFromIndex('${f.id}')" title="查找并下载关联的转录 .md">📝 .md</button>` : ''}
+          <button class="action-btn" onclick="processFile('${f.id}')">⚙️ 处理</button>
+          <button class="action-btn danger" onclick="deleteFile('${f.id}')">🗑️</button>
+        </div>
+      </div>`;
+    }).join('');
+  } catch(e) { toast('加载失败: ' + e.message, 'error'); }
+}
+
+// 点击 tag → filter
+// sidebar: 根据 mimeType 前缀计算类型
+function detectType(mt) {
+  if (!mt) return '';
+  if (mt.startsWith('video/')) return 'video';
+  if (mt.startsWith('image/')) return 'image';
+  if (mt.startsWith('audio/')) return 'audio';
+  if (mt.startsWith('text/') || mt.includes('json') || mt.includes('markdown') || mt.includes('xml')) return 'transcript';
+  if (mt.includes('srt') || mt.includes('vtt') || mt.includes('subtitle')) return 'subtitle';
+  return '';
+}
+
+// sidebar: 填充 type 计数 + tag 云
+function populateSidebar(files) {
+  const counts = { '': files.length, video: 0, transcript: 0, subtitle: 0, image: 0, audio: 0 };
+  const tagMap = {};
+  files.forEach(f => {
+    const t = detectType(f.mimeType);
+    if (counts[t] !== undefined) counts[t]++;
+    (f.tags || []).forEach(tg => { tagMap[tg] = (tagMap[tg] || 0) + 1; });
+  });
+  Object.entries(counts).forEach(([k, v]) => {
+    const el = document.getElementById('sb-count-' + (k || 'all'));
+    if (el) el.textContent = v;
+  });
+  const cloud = document.getElementById('sb-tag-cloud');
+  const tags = Object.entries(tagMap).sort((a, b) => b[1] - a[1]).slice(0, 20);
+  if (!tags.length) { cloud.innerHTML = '<div style="font-size:11px;color:#6b7280;padding:4px">暂无标签</div>'; return; }
+  cloud.innerHTML = tags.map(([t, c]) => `<span class="tag" onclick="filterByTag('${t.replace(/'/g, "\\'")}')">${escapeHtml(t)} <small style="opacity:.6">${c}</small></span>`).join('');
+}
+
+// sidebar: 按类型过滤
+async function filterByType(type) {
+  document.querySelectorAll('#sb-all,#sb-video,#sb-transcript,#sb-subtitle,#sb-image,#sb-audio').forEach(b => b.classList.remove('active'));
+  const map = { '': 'sb-all', video: 'sb-video', transcript: 'sb-transcript', subtitle: 'sb-subtitle', image: 'sb-image', audio: 'sb-audio' };
+  const btn = document.getElementById(map[type] || 'sb-all');
+  if (btn) btn.classList.add('active');
+  try {
+    const url = type ? (API + '/files?type=' + encodeURIComponent(type)) : (API + '/files');
+    const res = await fetch(url);
+    const d = await res.json();
+    if (!d.ok) { toast('加载失败', 'error'); return; }
+    document.getElementById('totalCount').textContent = d.count + (type ? ' / (type: ' + type + ')' : '');
+    const grid = document.getElementById('fileGrid');
+    if (!d.files.length) { grid.innerHTML = '<div class="empty">该类型下无文件 <button class="btn-sm" onclick="loadFiles()">清除筛选</button></div>'; return; }
+    grid.innerHTML = '<div style="margin-bottom:12px"><button class="btn-sm" onclick="loadFiles()">❌ 清除筛选 (' + type + ')</button></div>' + d.files.map(f => {
+      const tags = (f.tags || []);
+      const tagsHtml = tags.length
+        ? `<div class="file-tags">${tags.slice(0, 6).map(t => `<span class="tag" onclick="event.stopPropagation();filterByTag('${t.replace(/'/g, "\\'")}')">${escapeHtml(t)}</span>`).join('')}${tags.length > 6 ? `<span class="tag tag-more">+${tags.length - 6}</span>` : ''}</div>`
+        : '';
+      const descHtml = f.description ? `<div class="file-desc" title="${escapeHtml(f.description)}">${escapeHtml(f.description).slice(0, 80)}${f.description.length > 80 ? '...' : ''}</div>` : '';
+      return `
+      <div class="file-card">
+        <div class="file-preview">${getFileIcon(f.mimeType)}</div>
+        <div class="file-info">
+          <div class="file-name" title="${escapeHtml(f.originalName)}">${escapeHtml(f.originalName)}</div>
+          <div class="file-meta">${fmtSize(f.size)} · ${fmtTime(f.uploadedAt)}${f.category && f.category !== 'default' ? ' · ' + escapeHtml(f.category) : ''}</div>
+          ${tagsHtml}
+          ${descHtml}
+        </div>
+        <div class="file-actions">
+          <button class="action-btn" onclick="previewFile('${f.id}')">👁️ 预览</button>
+          <button class="action-btn" onclick="downloadFile('${f.id}')">⬇️ 下载</button>
+          ${(f.mimeType||'').startsWith('video/') ? `<button class="action-btn" onclick="downloadTranscriptFromIndex('${f.id}')" title="查找并下载关联的转录 .md">📝 .md</button>` : ''}
+          <button class="action-btn" onclick="processFile('${f.id}')">⚙️ 处理</button>
+          <button class="action-btn danger" onclick="deleteFile('${f.id}')">🗑️</button>
+        </div>
+      </div>`;
+    }).join('');
+  } catch(e) { toast('筛选失败: ' + e.message, 'error'); }
+}
+
+// wire sidebar buttons
+document.querySelectorAll('.sidebar .type-btn').forEach(b => b.addEventListener('click', () => filterByType(b.dataset.type || '')));
+
+async function filterByTag(tag) {
+  try {
+    const res = await fetch(API + '/files?tags=' + encodeURIComponent(tag));
+    const d = await res.json();
+    if (!d.ok) { toast('加载失败', 'error'); return; }
+    document.getElementById('totalCount').textContent = d.count + ' / (tag: ' + tag + ')';
+    const grid = document.getElementById('fileGrid');
+    if (!d.files.length) { grid.innerHTML = '<div class="empty">该标签下无文件 <button class="btn-sm" onclick="loadFiles()">清除筛选</button></div>'; return; }
+    grid.innerHTML = '<div style="margin-bottom:12px"><button class="btn-sm" onclick="loadFiles()">❌ 清除筛选 (' + tag + ')</button></div>' + d.files.map(f => {
+      const tags = (f.tags || []);
+      const tagsHtml = tags.length
+        ? `<div class="file-tags">${tags.slice(0, 6).map(t => `<span class="tag ${t === tag ? 'tag-active' : ''}" onclick="event.stopPropagation();filterByTag('${t.replace(/'/g, "\\'")}')">${escapeHtml(t)}</span>`).join('')}${tags.length > 6 ? `<span class="tag tag-more">+${tags.length - 6}</span>` : ''}</div>`
+        : '';
+      const descHtml = f.description ? `<div class="file-desc" title="${escapeHtml(f.description)}">${escapeHtml(f.description).slice(0, 80)}${f.description.length > 80 ? '...' : ''}</div>` : '';
+      return `
+      <div class="file-card">
+        <div class="file-preview">${getFileIcon(f.mimeType)}</div>
+        <div class="file-info">
+          <div class="file-name" title="${escapeHtml(f.originalName)}">${escapeHtml(f.originalName)}</div>
+          <div class="file-meta">${fmtSize(f.size)} · ${fmtTime(f.uploadedAt)}</div>
+          ${tagsHtml}
+          ${descHtml}
+        </div>
+        <div class="file-actions">
+          <button class="action-btn" onclick="previewFile('${f.id}')">👁️ 预览</button>
+          <button class="action-btn" onclick="downloadFile('${f.id}')">⬇️ 下载</button>
+          ${(f.mimeType||'').startsWith('video/') ? `<button class="action-btn" onclick="downloadTranscriptFromIndex('${f.id}')" title="查找并下载关联的转录 .md">📝 .md</button>` : ''}
+          <button class="action-btn" onclick="processFile('${f.id}')">⚙️ 处理</button>
+          <button class="action-btn danger" onclick="deleteFile('${f.id}')">🗑️</button>
+        </div>
+      </div>`;
+    }).join('');
+  } catch(e) { toast('筛选失败: ' + e.message, 'error'); }
+}
+
+// v8.119.40+ au: 转录 .md 关联查找 (index.html 版，与 videos.html 同源逻辑)
+let _idxTranscriptCache = null;
+let _idxTranscriptCacheAt = 0;
+async function _loadIdxTranscriptCache() {
+  const now = Date.now();
+  if (_idxTranscriptCache && now - _idxTranscriptCacheAt < 60000) return _idxTranscriptCache;
+  try {
+    const [r1, r2] = await Promise.all([
+      fetch(API + '/files?type=transcript&limit=500').then(r => r.json()),
+      fetch(API + '/files?category=douyin-transcribe&limit=500').then(r => r.json()),
+    ]);
+    const seen = new Set();
+    const merged = [];
+    for (const f of (r1.files || []).concat(r2.files || [])) {
+      if (!seen.has(f.id)) { seen.add(f.id); merged.push(f); }
+    }
+    _idxTranscriptCache = merged;
+    _idxTranscriptCacheAt = now;
+    return merged;
+  } catch (e) { return []; }
+}
+function _findIdxTranscript(videoFile) {
+  if (!_idxTranscriptCache || !_idxTranscriptCache.length) return null;
+  const videoName = (videoFile.originalName || '').replace(/\.[^.]+$/, '');
+  const videoTags = new Set(videoFile.tags || []);
+  const videoTime = videoFile.uploadedAt || 0;
+  let best = null;
+  let bestScore = 0;
+  for (const t of _idxTranscriptCache) {
+    if (!t.filename || !t.filename.match(/\.md$|\.srt$/i)) continue;
+    let score = 0;
+    const tName = (t.originalName || '').replace(/\.[^.]+$/, '');
+    if (videoName && tName && (videoName.includes(tName) || tName.includes(videoName))) score += 100;
+    const tTags = new Set(t.tags || []);
+    let intersect = 0;
+    for (const tag of videoTags) if (tTags.has(tag)) intersect++;
+    score += intersect * 5;
+    if (videoTime && t.uploadedAt) {
+      const diff = Math.abs(videoTime - t.uploadedAt);
+      if (diff < 5 * 60 * 1000) score += 50 - Math.floor(diff / 60000);
+    }
+    if (t.category === 'douyin-transcribe') score += 3;
+    if (t.filename.endsWith('.md')) score += 1;
+    if (score > bestScore) { bestScore = score; best = t; }
+  }
+  return bestScore >= 5 ? best : null;
+}
+async function downloadTranscriptFromIndex(videoId) {
+  let videoFile = null;
+  try {
+    const r = await fetch(API + '/files/' + videoId);
+    const d = await r.json();
+    videoFile = d.file;
+  } catch (e) { toast('获取视频信息失败', 'error'); return; }
+  if (!videoFile) { toast('视频信息丢失', 'error'); return; }
+  await _loadIdxTranscriptCache();
+  const md = _findIdxTranscript(videoFile);
+  if (!md) { toast('该视频暂无转录 .md (未跑过 douyin-transcribe)', 'error'); return; }
+  window.location.href = API + '/download/' + md.id;
+  toast('已下载: ' + md.originalName, 'success');
+}
+
+// HTML 转义
+function escapeHtml(s) {
+  if (!s) return '';
+  return String(s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+}
+
+async function deleteFile(id) {
+  if (!confirm('确认删除？')) return;
+  const d = await fetchJSON(API + '/files/' + id, 'DELETE');
+  if (d.ok) { toast('已删除', 'success'); loadFiles(); }
+  else toast('删除失败', 'error');
+}
+
+function previewFile(id) {
+  window.open(API + '/preview/' + id, '_blank');
+}
+
+function downloadFile(id) {
+  const a = document.createElement('a');
+  a.href = API + '/download/' + id;
+  a.download = '';
+  a.click();
+}
+
+// ── Process Modal ────────────────────────────────────────────────────
+let currentFileId = null;
+const PROCESS_ACTIONS = [
+  { action:'resize200', icon:'🖼️', label:'缩略图200' },
+  { action:'resize800', icon:'🖼️', label:'缩略图800' },
+  { action:'watermark', icon:'💧', label:'水印' },
+  { action:'compress', icon:'📦', label:'压缩' },
+  { action:'rotate90', icon:'🔄', label:'旋转90°' },
+  { action:'grayscale', icon:'⚫', label:'灰度化' },
+];
+
+async function processFile(id) {
+  currentFileId = id;
+  const grid = document.getElementById('processGrid');
+  grid.innerHTML = PROCESS_ACTIONS.map(a => `
+    <button class="process-btn" onclick="doProcess('${a.action}')">
+      <span class="p-icon">${a.icon}</span>${a.label}
+    </button>`).join('');
+  document.getElementById('processModal').classList.remove('hidden');
+}
+
+function closeModal() {
+  document.getElementById('processModal').classList.add('hidden');
+}
+
+async function doProcess(action) {
+  closeModal();
+  toast('处理中...');
+  const d = await fetchJSON(API + '/process/' + currentFileId + '?action=' + action, 'POST');
+  if (d.ok) { toast('处理完成', 'success'); loadFiles(); }
+  else toast('处理失败: ' + d.error, 'error');
+}
+
+// ── Upload with Progress ──────────────────────────────────────────────
+const CHUNK_SIZE = 2 * 1024 * 1024; // 2MB per chunk
+const uploadZone = document.getElementById('uploadZone');
+const fileInput = document.getElementById('fileInput');
+const uploadProgress = document.getElementById('uploadProgress');
+
+// Drag and drop
+uploadZone.addEventListener('dragover', (e) => {
+  e.preventDefault();
+  uploadZone.classList.add('dragover');
+});
+uploadZone.addEventListener('dragleave', () => {
+  uploadZone.classList.remove('dragover');
+});
+uploadZone.addEventListener('drop', (e) => {
+  e.preventDefault();
+  uploadZone.classList.remove('dragover');
+  handleFiles(e.dataTransfer.files);
+});
+
+// File input change
+fileInput.addEventListener('change', function() {
+  if (this.files.length) {
+    handleFiles(this.files);
+    this.value = '';
+  }
+});
+
+async function handleFiles(files) {
+  uploadProgress.style.display = 'block';
+  for (const file of files) {
+    await uploadFileWithProgress(file);
+  }
+  loadFiles();
+}
+
+async function uploadFileWithProgress(file) {
+  const uploadId = crypto.randomUUID();
+  const totalChunks = Math.ceil(file.size / CHUNK_SIZE);
+  const category = 'default';
+  const fileName = file.name;
+
+  // Create progress UI
+  const progressId = `progress-${uploadId}`;
+  const progressHtml = `
+    <div class="upload-progress-item" id="${progressId}">
+      <div class="upload-progress-name">${file.name}</div>
+      <div class="upload-progress-bar">
+        <div class="upload-progress-fill" id="${progressId}-fill" style="width:0%"></div>
+      </div>
+      <div class="upload-progress-pct" id="${progressId}-pct">0%</div>
+      <div class="upload-progress-status" id="${progressId}-status">准备中...</div>
+    </div>`;
+  uploadProgress.insertAdjacentHTML('beforeend', progressHtml);
+
+  const fillEl = document.getElementById(`${progressId}-fill`);
+  const pctEl = document.getElementById(`${progressId}-pct`);
+  const statusEl = document.getElementById(`${progressId}-status`);
+
+  try {
+    // Query upload status for resume
+    let uploadedChunks = [];
+    try {
+      const statusRes = await fetch(`${API}/upload/status/${uploadId}`);
+      const statusData = await statusRes.json();
+      if (statusData.ok) uploadedChunks = statusData.uploadedChunks || [];
+    } catch(e) {}
+
+    // Upload chunks
+    for (let i = 0; i < totalChunks; i++) {
+      if (uploadedChunks.includes(i)) {
+        updateProgress(fillEl, pctEl, statusEl, i, totalChunks, '续传中...');
+        continue;
+      }
+
+      const start = i * CHUNK_SIZE;
+      const end = Math.min(start + CHUNK_SIZE, file.size);
+      const chunk = file.slice(start, end);
+
+      try {
+        // v8.118: 用 X-File-Name (base64) header 传中文名，避免 nginx 对 raw UTF-8 URL 返回 400
+        // query 参数仍保留供老客户端兼容
+        const fnameB64 = btoa(unescape(encodeURIComponent(fileName)));
+        await fetch(`${API}/upload/chunk?uploadId=${uploadId}&chunkIndex=${i}&totalChunks=${totalChunks}&category=${category}`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/octet-stream', 'X-File-Name': fnameB64 },
+          body: chunk,
+        });
+      } catch(e) {
+        // Retry once
+        try {
+          const fnameB64 = btoa(unescape(encodeURIComponent(fileName)));
+          await fetch(`${API}/upload/chunk?uploadId=${uploadId}&chunkIndex=${i}&totalChunks=${totalChunks}&category=${category}`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/octet-stream', 'X-File-Name': fnameB64 },
+            body: chunk,
+          });
+        } catch(e2) {
+          throw new Error(`分片 ${i} 上传失败: ${e2.message}`);
+        }
+      }
+
+      updateProgress(fillEl, pctEl, statusEl, i + 1, totalChunks, '上传中...');
+    }
+
+    // Merge chunks
+    statusEl.textContent = '合并中...';
+    const mergeRes = await fetch(`${API}/upload/merge`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ uploadId, fileName: file.name, totalChunks, category }),
+    });
+    const mergeData = await mergeRes.json();
+
+    if (mergeData.ok) {
+      statusEl.textContent = '✅ 完成';
+      statusEl.style.color = '#22c55e';
+      toast(`${file.name} 上传成功`, 'success');
+    } else {
+      throw new Error(mergeData.error || '合并失败');
+    }
+  } catch(e) {
+    statusEl.textContent = '❌ ' + e.message;
+    statusEl.style.color = '#ef4444';
+    toast(`${file.name} 上传失败: ${e.message}`, 'error');
+  }
+}
+
+function updateProgress(fillEl, pctEl, statusEl, uploaded, total, statusText) {
+  const pct = Math.round((uploaded / total) * 100);
+  fillEl.style.width = pct + '%';
+  pctEl.textContent = pct + '%';
+  statusEl.textContent = statusText;
+}
+
+// ── Workspace Browser ─────────────────────────────────────────────────
+let currentWsId = null;
+let currentWsPath = '';
+
+async function loadWorkspaces() {
+  try {
+    const d = await fetchJSON(API + '/workspaces');
+    document.getElementById('wsCount').textContent = d.workspaces.length;
+    let totalFiles = 0, totalSize = 0;
+    d.workspaces.forEach(w => { totalFiles += w.fileCount||0; totalSize += w.totalSize||0; });
+    document.getElementById('wsFiles').textContent = totalFiles;
+    document.getElementById('wsTotalSize').textContent = fmtSize(totalSize);
+    const list = document.getElementById('wsList');
+    list.innerHTML = '<div class="ws-grid">' + d.workspaces.map(ws => `
+      <div class="ws-card" onclick="browseWorkspace('${ws.id}')">
+        <div class="ws-label">${ws.label}</div>
+        <div class="ws-meta">${ws.fileCount} 文件 · ${fmtSize(ws.totalSize)}</div>
+      </div>`).join('') + '</div>';
+  } catch(e) { toast('加载失败', 'error'); }
+}
+
+async function browseWorkspace(wsId, subPath='') {
+  currentWsId = wsId;
+  currentWsPath = subPath;
+  document.getElementById('wsList').style.display = 'none';
+  const browser = document.getElementById('wsBrowser');
+  browser.style.display = 'block';
+
+  // Build path breadcrumb
+  const pathParts = (subPath ? subPath.split('/') : []);
+  let pathHtml = `<button class="back-btn" onclick="browseWorkspace('${wsId}', '')">🏠 ${wsId}</button>`;
+  if (pathParts.length > 0) {
+    let accumulated = '';
+    pathParts.forEach(p => {
+      accumulated += (accumulated ? '/' : '') + p;
+      pathHtml += ` <span style="color:#6b7280">›</span> <button onclick="browseWorkspace('${wsId}','${accumulated}')">${p}</button>`;
+    });
+  }
+  document.getElementById('wsPathDisplay').innerHTML = pathHtml;
+
+  const d = await fetchJSON(API + '/workspaces/' + wsId + '/files?path=' + encodeURIComponent(subPath));
+  if (!d.ok) { toast(d.error, 'error'); return; }
+  const parentBtn = subPath
+    ? `<button class="back-btn" onclick="browseWorkspace('${wsId}','${getParentPath(subPath)}')">⬆️ 返回上级</button>`
+    : '';
+  document.getElementById('wsPathDisplay').innerHTML = parentBtn + ' ' + pathHtml;
+
+  if (!d.items.length) {
+    document.getElementById('wsItems').innerHTML = '<div class="empty">空目录</div>';
+    return;
+  }
+  document.getElementById('wsItems').innerHTML = d.items.map(item => `
+    <div class="ws-item" onclick="${item.type==='dir' ? `browseWorkspace('${wsId}','${subPath?subPath+'/':''}${item.name}')` : `viewFile('${wsId}','${subPath?subPath+'/':''}${item.name}')`}">
+      <span class="ws-item-icon">${item.type==='dir'?'📁':'📄'}</span>
+      <span class="ws-item-name">${item.name}</span>
+      <span class="ws-item-size">${item.type==='file'?fmtSize(item.size):''}</span>
+    </div>`).join('');
+}
+
+async function viewFile(wsId, filePath) {
+  const d = await fetchJSON(API + '/workspaces/' + wsId + '/read?file=' + encodeURIComponent(filePath));
+  if (!d.ok) { toast(d.error, 'error'); return; }
+  const ext = filePath.split('.').pop().toLowerCase();
+  if (['md','txt','json','js','ts','py','sh','yaml','yml'].includes(ext)) {
+    const win = window.open('', '_blank');
+    win.document.write('<html><head><title>'+filePath+'</title><style>body{background:#0f1117;color:#e2e8f0;padding:20px;font-family:monospace;white-space:pre-wrap;word-break:break-all}</style></head><body>'+d.content.replace(/</g,'&lt;')+'</body></html>');
+  } else {
+    window.open(API + '/workspaces/' + wsId + '/read?file=' + encodeURIComponent(filePath), '_blank');
+  }
+}
+
+// ── Utilities ────────────────────────────────────────────────────────
+async function fetchJSON(url, method='GET', body=null) {
+  const opts = { method };
+  if (body) opts.body = body;
+  const res = await fetch(url, opts);
+  return res.json();
+}
+
+function fmtSize(bytes) {
+  if (!bytes) return '0 B';
+  const k = 1024;
+  const sizes = ['B','KB','MB','GB'];
+  const i = Math.floor(Math.log(bytes)/Math.log(k));
+  return parseFloat((bytes/Math.pow(k,i)).toFixed(1)) + ' ' + sizes[i];
+}
+
+function fmtTime(ts) {
+  return new Date(ts).toLocaleString('zh-CN', {timeZone:'Asia/Shanghai', month:'2-digit', day:'2-digit', hour:'2-digit', minute:'2-digit'});
+}
+
+function getFileIcon(mimeType) {
+  if (!mimeType) return '📄';
+  if (mimeType.startsWith('image/')) return '🖼️';
+  if (mimeType.startsWith('video/')) return '🎬';
+  if (mimeType.startsWith('audio/')) return '🎵';
+  if (mimeType.includes('pdf')) return '📕';
+  if (mimeType.includes('zip')||mimeType.includes('tar')||mimeType.includes('rar')) return '📦';
+  return '📄';
+}
+
+function getParentPath(p) {
+  const parts = p.split('/').filter(Boolean);
+  parts.pop();
+  return parts.join('/');
+}
+
+// Init
+if (currentTab === 'files') loadFiles();
+else loadWorkspaces();
+</script>
+</body>
+</html>
