@@ -9,7 +9,7 @@ services:
     build:
       context: ./services/content-pipeline-mcp
       dockerfile: Dockerfile
-    image: ghcr.io/main-1/content-pipeline/content-pipeline-mcp:0.1.0
+    image: localhost:5000/content-pipeline/content-pipeline-mcp:0.1.0
     container_name: content-pipeline-mcp
     restart: unless-stopped
     # NOTE: 18092 occupied by systemd unit; expose 28092 for verification
@@ -49,7 +49,7 @@ services:
     build:
       context: ./services/file-service
       dockerfile: Dockerfile
-    image: ghcr.io/main-1/content-pipeline/file-service:0.1.0
+    image: localhost:5000/content-pipeline/file-service:0.1.0
     container_name: file-service
     restart: unless-stopped
     # 错位端口: 容器 18098 ↔ host 28098 (systemd 18098 不停)
@@ -82,7 +82,7 @@ services:
     build:
       context: ./services/douyin-recorder/source
       dockerfile: ../Dockerfile
-    image: ghcr.io/main-1/content-pipeline/douyin-recorder:0.1.0
+    image: localhost:5000/content-pipeline/douyin-recorder:0.1.0
     container_name: douyin-recorder
     restart: unless-stopped
     # 无端口 — recorder 不暴露 HTTP
@@ -115,7 +115,7 @@ services:
     build:
       context: ./services/v6-monitor
       dockerfile: Dockerfile
-    image: ghcr.io/main-1/content-pipeline/v6-monitor:0.1.0
+    image: localhost:5000/content-pipeline/v6-monitor:0.1.0
     container_name: v6-monitor
     restart: unless-stopped
     # 无端口 — v6-monitor 是 daemon, 无 HTTP 端点
@@ -149,7 +149,7 @@ services:
     build:
       context: ./services/v6-enqueue
       dockerfile: Dockerfile
-    image: ghcr.io/main-1/content-pipeline/v6-enqueue:0.1.0
+    image: localhost:5000/content-pipeline/v6-enqueue:0.1.0
     container_name: v6-enqueue
     # 不 restart — enqueue 是 cron 驱动, 跑完即退
     # 由 host cron 或 docker compose run 启动
@@ -168,7 +168,7 @@ services:
     build:
       context: ./services/v6-download
       dockerfile: Dockerfile
-    image: ghcr.io/main-1/content-pipeline/v6-download:0.1.0
+    image: localhost:5000/content-pipeline/v6-download:0.1.0
     container_name: v6-download
     restart: unless-stopped
     profiles: ["v6-workers"]
@@ -198,7 +198,7 @@ services:
     build:
       context: ./services/v6-transcribe
       dockerfile: Dockerfile
-    image: ghcr.io/main-1/content-pipeline/v6-transcribe:0.1.0
+    image: localhost:5000/content-pipeline/v6-transcribe:0.1.0
     container_name: v6-transcribe
     restart: unless-stopped
     profiles: ["v6-workers"]
@@ -216,7 +216,7 @@ services:
     build:
       context: ./services/v6-distill
       dockerfile: Dockerfile
-    image: ghcr.io/main-1/content-pipeline/v6-distill:0.1.0
+    image: localhost:5000/content-pipeline/v6-distill:0.1.0
     container_name: v6-distill
     restart: unless-stopped
     profiles: ["v6-workers"]
@@ -236,7 +236,7 @@ services:
     build:
       context: ./services/v6-upload
       dockerfile: Dockerfile
-    image: ghcr.io/main-1/content-pipeline/v6-upload:0.1.0
+    image: localhost:5000/content-pipeline/v6-upload:0.1.0
     container_name: v6-upload
     restart: unless-stopped
     profiles: ["v6-workers"]

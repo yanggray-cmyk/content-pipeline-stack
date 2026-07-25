@@ -1,30 +1,23 @@
 # v6-enqueue — 把 download_list.json pending 一次性 LPUSH 到 download queue
-# Build context: ./services/v6-enqueue (本目录)
-# Dockerfile FROM v6-base (避免重复层)
 #
-# 用法:
-#   docker build -t ghcr.io/main-1/content-pipeline/v6-enqueue:0.1.0 \
-#       -f Dockerfile ../v6-base
+# 设计: cron 驱动,不常驻
+#   docker compose run --rm v6-enqueue \
+#       python -u /home/main/douyin-data/scripts/v6_pipeline/v6_enqueue.py
 #
-# 设计:
-#   - 不放源码, host bind /home/main/douyin-data (含 v6_pipeline 脚本目录)
-#   - 不放 accounts.json (host bind)
-#   - 不写状态 (只读 read download_list.json + state.db)
+# 容器启动后默认 sleep infinity (等待手动触发),健康检查通过
+# 实际入队由 host cron 触发:
+#   5 * * * * docker compose -f /path/docker-compose.yml run --rm v6-enqueue \
+#       python -u /home/main/douyin-data/scripts/v6_pipeline/v6_enqueue.py
 #
-# 跟 systemd 行为对齐:
-#   - WORKDIR=/home/main/douyin-data
-#   - 调 v6_enqueue.py from cron */15 (跟 systemd 一致)
-#
-# 关键:
-#   - 容器只跑 python 解释器
-#   - 改 v6_enqueue.py 不用 rebuild, restart 即可
-#   - 共享 v6-base image (5 worker 一致 Python 版本)
+# 共享 v6-base image (跟 4 worker 一致 Python 版本)
 
 FROM ghcr.io/main-1/content-pipeline/v6-base:0.1.0
 
-# ENTRYPOINT 复用 base 的 tini
+# 健康检查: 验证 queue.db 可写 (跟 systemd cron */5 对齐)
+HEALTHCHECK --interval=60s --timeout=10s --start-period=10s --retries=3 \
+    CMD python -c "import sqlite3; sqlite3.connect('/data/queue.db').close(); print('queue.db OK')" || exit 1
+
 ENTRYPOINT ["/usr/bin/tini", "--"]
 
-# 默认空跑 (实际由 cron 调 docker run --rm 或 systemd timer 启)
-# 容器模式可改: docker compose run --rm v6-enqueue
-CMD ["python", "-c", "import sys; sys.path.insert(0, '/data/scripts/v6_pipeline'); import v6_enqueue; print('v6-enqueue OK')"]
+# 默认 sleep infinity, 等 cron 触发 docker compose run
+CMD ["sleep", "infinity"]

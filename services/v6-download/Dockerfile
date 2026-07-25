@@ -29,4 +29,4 @@ ENV PLAYWRIGHT_BROWSERS_PATH=/ms-playwright
 ENTRYPOINT ["/usr/bin/tini", "--"]
 
 # 持续 worker_loop 跑 (跟 systemd 一样)
-CMD ["python", "-u", "-m", "v6_pipeline.v6_download_worker"]
+CMD ["python", "-u", "/home/main/douyin-data/scripts/v6_pipeline/v6_download_worker.py"]

@@ -21,4 +21,4 @@ ENV KB_DATA_DIR=/data/knowledge-base
 
 ENTRYPOINT ["/usr/bin/tini", "--"]
 
-CMD ["python", "-u", "-m", "v6_pipeline.v6_distill_worker"]
+CMD ["python", "-u", "/home/main/douyin-data/scripts/v6_pipeline/v6_distill_worker.py"]

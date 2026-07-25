@@ -21,4 +21,4 @@ ENV HK_ASR_URL=http://host.docker.internal:18200
 
 ENTRYPOINT ["/usr/bin/tini", "--"]
 
-CMD ["python", "-u", "-m", "v6_pipeline.v6_transcribe_worker"]
+CMD ["python", "-u", "/home/main/douyin-data/scripts/v6_pipeline/v6_transcribe_worker.py"]
