@@ -23,10 +23,10 @@ WORKDIR /home/main/douyin-data/scripts/v6_pipeline
 
 # Copy v6_monitor.py + monitor/ scripts (only Python stdlib needed)
 COPY v6_monitor.py ./
-COPY monitor/ ./monitor/ 2>/dev/null || true
+COPY monitor/ ./monitor/
 
 # Non-root: image ships 'www-data' or create 'monitor' user (uid 1001 to avoid node 1000)
-RUN useradd -u 1001 -m -d /home/monitor -s /bin/bash monitor 2>/dev/null || true
+RUN useradd -u 1001 -m -d /home/monitor -s /bin/bash monitor
 
 # Note: 这个 service 需要写 /home/main/douyin-data/* (state.db, download_list.json)
 # 不能 USER monitor — main 用户 UID 1000 写权限最简单
