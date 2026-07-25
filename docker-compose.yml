@@ -121,18 +121,22 @@ services:
     image: ghcr.io/main-1/content-pipeline/v6-monitor:0.1.0
     container_name: v6-monitor
     restart: unless-stopped
-    ports:
-      - "18199:18199"           # 新 HTTP API (replaces SIGUSR1)
+    # 无端口 — v6-monitor 是 daemon, 无 HTTP 端点
+    # systemd 跑 24h loop, 容器跑 --once 由 restart policy 接管
     environment:
       V6_WORKDIR: /home/main/douyin-data
-      MONITOR_INTERVAL_HOURS: "6"
       MCP_URL: http://content-pipeline-mcp:18092/mcp
       DOUYIN_COOKIE_PATH: /home/main/douyin-data/config/cookies
       TZ: Asia/Shanghai
     env_file:
       - ./.env
     volumes:
+      # 主机磁盘是 source-of-truth, 容器只是 Python 解释器
+      # v6_monitor.py 需要 from douyin_api import (brand-video-tools 库)
+      # 需要 from v6_enqueue import (v6_pipeline 兄弟模块)
+      # 需要读 accounts.json + 写 state.db + download_list.json
       - /home/main/douyin-data:/home/main/douyin-data
+      - /home/main/.openclaw/workspace/skills/brand-video-tools:/home/main/.openclaw/workspace/skills/brand-video-tools
     deploy:
       resources:
         limits:
