@@ -77,41 +77,6 @@ services:
     depends_on:
       - content-pipeline-mcp
 
-  # ─── douyin-recorder (Douyin live stream recorder via ffmpeg) ───────────────
-  # TODO Day 1.2.3 — uses upstream Dockerfile + local config.ini overrides
-  douyin-recorder:
-    image: ghcr.io/main-1/content-pipeline/douyin-recorder:0.1.0
-    build:
-      context: /home/main/DouyinLiveRecorder
-      dockerfile: Dockerfile
-    container_name: douyin-recorder
-    restart: unless-stopped
-    ports:
-      - "18988:18988"           # BFF dashboard port
-    environment:
-      TZ: Asia/Shanghai
-      # Auto-restart hook for new recordings → trigger transcribe (wraps hk-asr)
-      TRANSCRIBE_HOOK_ENABLED: "true"
-      TRANSCRIBE_HOOK_SCRIPT: /hooks/transcribe-hook-wrapper.sh
-      MCP_URL: http://content-pipeline-mcp:18092/mcp
-    env_file:
-      - ./.env
-    volumes:
-      # Streaming output
-      - /home/main/DouyinLiveRecorder/downloads:/app/downloads
-      # Config (URL_config.ini + config.ini)
-      - /home/main/douyin-data/config/douyin-recorder:/app/config:ro
-      # Transcribe hook script
-      - /home/main/douyin-data/scripts/hooks:/hooks:ro
-    deploy:
-      resources:
-        limits:
-          memory: 1.5G         # Chromium browser + ffmpeg (铁律 168)
-    networks:
-      - content-pipeline-net
-    depends_on:
-      - content-pipeline-mcp
-
   # ─── douyin-recorder (DouyinLiveRecorder upstream, ffmpeg + nodejs 抖音签名) ─────────────────────────────
   douyin-recorder:
     build:
