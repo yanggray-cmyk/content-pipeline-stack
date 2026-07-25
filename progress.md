@@ -132,3 +132,68 @@ bd71ec4 docs(stack): 三个 service README + Dockerfile shell-syntax 修复
 - (c) push 镜像到 GHCR
 - (d) 4 服务全栈 end-to-end smoke test
 
+
+---
+
+## ✅ 2026-07-26 01:42 — Day 3 (a)+(b) 完成, (c) (d) 阻塞
+
+### Day 3 (a) — v6-monitor SIGUSR1 验证通过
+
+- ✅ `docker kill -s SIGUSR1 v6-monitor` → python 立即重跑
+- ✅ state.db 跟 systemd 共享 (`/home/main/douyin-data/monitor_state.db`)
+- ✅ 4 enabled 账号全跑 + v6_enqueue 原子入队 (skip_in_queue=2210)
+- ✅ v6_monitor.py 无 TCP/HTTP 端点 — 验证只能 SIGUSR1
+
+**关键修复 (Bug #5/#6/#7)**:
+- 5: brand-video-tools bind 缺 → 补
+- 6: `--once` 立即退出 → 改 `--daemon --interval 21600`
+- 7: bookworm-slim 无 wget → healthcheck curl
+
+### Day 3 (b) — douyin-recorder 容器化
+
+- ✅ Dockerfile: python:3.11-slim + nodejs 20 + ffmpeg + tzdata + tini
+- ✅ USER 1001:1001 (跟 host main 对齐, downloads/ 写权限)
+- ✅ image build 1.15GB / 264MB compressed
+- ✅ import test: main + src.* + ffmpeg_install + msg_push 全 OK
+- ✅ docker run 起 → monitor loop 看到 (等待直播, 循环 300s)
+- ✅ 7 commits: `b762724 feat(douyin-recorder): 容器化`
+
+**Bug 修复**:
+- ffmpeg_install.py 误删 (以为 Windows 工具) → 实际 main.py line 37 真引用, 回填
+
+### (c) GHCR push — 受阻
+
+**现状**:
+- 无 GHCR credential (无 PAT token / 无 docker login)
+- 替代方案: rsync ssh 推 HZ → 速度 **130 KB/s** (1.15GB douyin-recorder 需 2.5h, 不实用)
+- 小镜像 (v6-monitor 197MB) 推 HZ 也要 25 min, 不实用
+
+**结论**: 本地 4 image tag 占位符命名 (ghcr.io/main-1/...), 等 GHCR PAT 再 push。docker compose 引用本地 image 名即可,不影响 dev。
+
+### (d) 切 systemd → docker recorder — 阻塞 (需 sudo)
+
+```
+$ systemctl stop douyin-recorder
+Failed to stop douyin-recorder.service: Interactive authentication required.
+```
+
+- systemd PID 968775 active, 主播 1 个 (北京台财经拍宝节目)
+- docker compose 文件已就绪, 切换只需 sudo 一步
+- 切之前必须 sudo: `systemctl stop + disable douyin-recorder`
+
+### 当前镜像统计
+
+| 镜像 | 大小 | 状态 |
+|---|---|---|
+| content-pipeline-mcp | 280MB / 64MB | ✅ 跑通 (port 28092→18092) |
+| file-service | 605MB / 154MB | ✅ 跑通 (port 28098→18098) |
+| v6-monitor | 197MB / 49MB | ✅ 跑通 (daemon + SIGUSR1) |
+| douyin-recorder | 1.15GB / 264MB | ✅ build 成 (待切) |
+
+**总磁盘占用**: 2.23 GB (4 镜像)
+
+### 下次 session 第一件事
+
+1. **Cove 拍板 (c)**: GHCR PAT token 或 走 docker save/scp 跨机房方案
+2. **Cove 拍板 (d)**: sudo 切 douyin-recorder 到 docker, 或保留 systemd (本期不动)
+3. **Day 4**: 数据持久化设计 (host bind vs named volume vs S3)
