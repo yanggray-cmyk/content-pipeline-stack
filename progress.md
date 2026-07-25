@@ -86,3 +86,49 @@
 | `content-pipeline-stack/task_plan.md` | 完整规划 (8 拍板 / 3 周 / 文件结构 / 验收) |
 | `content-pipeline-stack/progress.md` | 本文件 |
 | `content-pipeline-stack/findings.md` | 研究发现 (HZ Yuxi + MCP 协议 + 现有 systemd) |
+---
+
+## ✅ 2026-07-25 23:54 — Day 2 完成
+
+**Day 2.1–2.3 (Dockerfile + source + README):** ✅
+**Day 2.4 (build):** ✅ 3 镜像全 build 成
+**Day 2.5 (docker-compose up):** ✅ 2 容器跑通
+**Day 2.6 (e2e verify):** ✅ 总览
+
+### 修复的 4 个生产 Bug
+
+| # | Bug | 根因 | 修复 |
+|---|---|---|---|
+| 1 | `COPY ... 2>/dev/null \|\| true` | Dockerfile 不支持 shell | 移除 |
+| 2 | alpine sharp build-from-source 失败 | sharp 无 alpine prebuilt | 切 bookworm-slim + apt libvips |
+| 3 | USER node=uid 1000 vs disk owner uid 1001 | alpine 'node' vs host 'main' | USER 1001:1001 映射 |
+| 4 | mkdir EACCES `.openclaw/data/audit/file-service` | compose 缺 bind /home/main/uploads + .openclaw | 补 volumes |
+
+### 验证 (23:54 实测)
+
+| 服务 | 镜像 | 容器 | 端口 | 健康 |
+|---|---|---|---|---|
+| content-pipeline-mcp | 280MB/64MB | Up healthy | 28092→18092 | ✅ |
+| file-service | 605MB/154MB | Up healthy | 28098→18098 | ✅ |
+| v6-monitor | 209MB/49MB | (built, 未 up) | — | ✅ |
+
+- **file-service 同 systemd 18098 共存**: docker 28098 + systemd 18098 同份磁盘 5294 files ✅
+- **POST /upload 实测**: 返回 `{ok: true, file: {id, size:16, mime:image/png}}` ✅
+- **容器内 uid=1001 gid=1001** = host main, EACCES 消除 ✅
+
+### 4 Commits
+
+```
+d382a8d fix(file-service): UID 1001:1001 + 补 bind uploads + .openclaw volumes
+4bf658f fix(file-service): alpine → bookworm-slim sharp prebuilt
+bd71ec4 docs(stack): 三个 service README + Dockerfile shell-syntax 修复
+72d5358 feat(stack): docker-compose 初始化 — Week 1 Day 1+2
+```
+
+### 待办 Day 3 候选
+
+- (a) v6-monitor 容器 up + daemon 重跑 SIGUSR1 验证
+- (b) douyin-recorder Dockerfile 写完 build(用上游 Dockerfile)
+- (c) push 镜像到 GHCR
+- (d) 4 服务全栈 end-to-end smoke test
+
