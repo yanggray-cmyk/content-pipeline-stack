@@ -269,3 +269,22 @@ dashboard-v3-bff (18099) / hk-ts-lb (18090) / hk-report-server / openclaw-gatewa
 ## ⏰ 下一步
 
 **等 Cove 拍板 8 件事** (见 `task_plan.md`)。拍板后从 `services/content-pipeline-mcp/Dockerfile` 开始。
+---
+
+## 📚 附录: 持久化设计完整版 → [findings-persistence.md](./findings-persistence.md)
+
+**Day 4 拍板文档** (2026-07-26 01:44):
+- 5 类数据清单 (mp4/db/transcripts/uploads/模型)
+- 3 个方案对比 (host bind vs named volume vs S3)
+- HK 当前实测 bind (Day 2-3 现状)
+- 多机房场景 (HK+HZ+第三地) 4 个方案
+- 决策矩阵 (按数据类型选方案)
+- 待 Cove 拍板 3 件事:
+  - (e) 多机房数据同步策略 (rsync / S3 / 主从 / 单点)
+  - (f) 灾备 backup 频率 + 目标
+  - (g) 容器写 host 权限范围
+
+**关键洞察** (本附录详细):
+1. db (queue/monitor_state) 永远 host bind, 不 S3
+2. 模型 host bind, 不 COPY 进镜像 (镜像小 + 多 worker 共享缓存)
+3. mp4 + transcripts + uploads 同盘 /home/main/douyin-data/,一个 mount 涵盖三类
