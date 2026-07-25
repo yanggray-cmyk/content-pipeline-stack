@@ -14,6 +14,7 @@ WORKDIR /build
 
 COPY package.json package-lock.json ./
 RUN npm ci --no-audit --no-fund --omit=dev
+COPY healthcheck.js /app/healthcheck.js
 
 # ─── Stage 2: runtime ───────────────────────────────────────────────────────
 FROM node:24-bookworm-slim AS runtime
@@ -33,6 +34,7 @@ LABEL org.opencontainers.image.source="https://github.com/main-1/content-pipelin
 WORKDIR /app
 
 COPY --from=builder /build/node_modules ./node_modules
+COPY --from=builder /app/healthcheck.js ./healthcheck.js
 COPY server.js ./
 COPY package.json ./
 COPY lib/ ./lib/
@@ -46,7 +48,7 @@ USER 1001:1001
 EXPOSE 18098
 
 HEALTHCHECK --interval=30s --timeout=5s --retries=3 --start-period=10s \
-  CMD curl -fsS http://127.0.0.1:18098/health || exit 1
+  CMD node /app/healthcheck.js || exit 1
 
 CMD ["node", "server.js"]
 

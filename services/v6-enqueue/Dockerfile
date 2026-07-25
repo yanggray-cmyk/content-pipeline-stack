@@ -15,7 +15,7 @@ FROM ghcr.io/main-1/content-pipeline/v6-base:0.1.0
 
 # 健康检查: 验证 queue.db 可写 (跟 systemd cron */5 对齐)
 HEALTHCHECK --interval=60s --timeout=10s --start-period=10s --retries=3 \
-    CMD python -c "import sqlite3; sqlite3.connect('/data/queue.db').close(); print('queue.db OK')" || exit 1
+    CMD python -c "import sqlite3, os; sqlite3.connect(os.environ.get('V6_WORKDIR', '/data') + '/queue.db').close(); print('queue.db OK')" || exit 1
 
 ENTRYPOINT ["/usr/bin/tini", "--"]
 

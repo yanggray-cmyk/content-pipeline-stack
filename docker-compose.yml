@@ -1,6 +1,7 @@
-# docker-compose.yml — content-pipeline-stack (P0 Week 1)
-# 单栈编排:content-pipeline-mcp + file-service + douyin-recorder + v6-monitor
-# 4 服务,从 systemd 平滑迁移过来,跟现有 systemd 并行运行一段时间后切换
+# docker-compose.yml — content-pipeline-stack
+# 9 服务: 4 default + 5 v6-workers (profile)
+# 设计: 纯源码模式, 所有路径走 .env
+# 别人部署: cp .env.example .env → 改路径 → docker compose up
 
 services:
 
@@ -9,10 +10,9 @@ services:
     build:
       context: ./services/content-pipeline-mcp
       dockerfile: Dockerfile
-    image: localhost:5000/content-pipeline/content-pipeline-mcp:0.1.0
+    image: ${REGISTRY_URL:-localhost:5000}/content-pipeline/content-pipeline-mcp:${IMAGE_TAG:-0.1.0}
     container_name: content-pipeline-mcp
     restart: unless-stopped
-    # NOTE: 18092 occupied by systemd unit; expose 28092 for verification
     ports:
       - "28092:18092"
     environment:
@@ -22,7 +22,7 @@ services:
       - ./.env
     volumes:
       # Read-only access to pipeline data dir (queue.db, transcripts, cookies)
-      - /home/main/douyin-data:/home/main/douyin-data:ro
+      - ${DATA_DIR}:${DATA_DIR}:ro
     deploy:
       resources:
         limits:
@@ -44,29 +44,26 @@ services:
     networks:
       - content-pipeline-net
 
-  # ─── file-service (Node.js video/file browsing + upload, 851MB RSS) ────────
+  # ─── file-service (Node.js video/file browsing + upload) ─────────────────────
   file-service:
     build:
       context: ./services/file-service
       dockerfile: Dockerfile
-    image: localhost:5000/content-pipeline/file-service:0.1.0
+    image: ${REGISTRY_URL:-localhost:5000}/content-pipeline/file-service:${IMAGE_TAG:-0.1.0}
     container_name: file-service
     restart: unless-stopped
-    # 错位端口: 容器 18098 ↔ host 28098 (systemd 18098 不停)
     ports:
       - "28098:18098"
     environment:
       NODE_ENV: production
       PORT: "18098"
-      FS_DATA_ROOT: /home/main/douyin-data/files
+      FS_DATA_ROOT: ${DATA_DIR}/files
     env_file:
       - ./.env
     volumes:
-      - /home/main/douyin-data:/home/main/douyin-data
-      # server.js 需要读写 uploads (上传/下载) + .openclaw/data (audit log)
-      # 如跟 systemd 共存, bind 同一份主备数据, 双向同步
-      - /home/main/uploads:/home/main/uploads
-      - /home/main/.openclaw:/home/main/.openclaw
+      - ${DATA_DIR}:${DATA_DIR}
+      - ${UPLOADS_DIR}:${UPLOADS_DIR}
+      - ${OPENCLAW_DIR}:${OPENCLAW_DIR}
     deploy:
       resources:
         limits:
@@ -77,177 +74,165 @@ services:
     depends_on:
       - content-pipeline-mcp
 
-  # ─── douyin-recorder (DouyinLiveRecorder upstream, ffmpeg + nodejs 抖音签名) ─────────────────────────────
+  # ─── douyin-recorder (DouyinLiveRecorder upstream, ffmpeg + nodejs) ─────────
   douyin-recorder:
     build:
       context: ./services/douyin-recorder/source
       dockerfile: ../Dockerfile
-    image: localhost:5000/content-pipeline/douyin-recorder:0.1.0
+    image: ${REGISTRY_URL:-localhost:5000}/content-pipeline/douyin-recorder:${IMAGE_TAG:-0.1.0}
     container_name: douyin-recorder
     restart: unless-stopped
-    # 无端口 — recorder 不暴露 HTTP
-    # stdin_open + tty: docker exec 进容器调试
     stdin_open: true
     tty: true
     environment:
-      TZ: Asia/Shanghai
+      TZ: ${TZ:-Asia/Shanghai}
       PYTHONUNBUFFERED: "1"
     volumes:
-      # 主机磁盘是 source-of-truth (config.ini 含 cookie + URL_config.ini 直播间列表)
-      # downloads/logs/backup_config 也 bind → 容器跟 systemd 共享同一份 (9G 输出)
-      - /home/main/DouyinLiveRecorder/config:/app/config
-      - /home/main/DouyinLiveRecorder/downloads:/app/downloads
-      - /home/main/DouyinLiveRecorder/logs:/app/logs
-      - /home/main/DouyinLiveRecorder/backup_config:/app/backup_config
+      - ${RECORDER_DIR}/config:/app/config
+      - ${RECORDER_DIR}/downloads:/app/downloads
+      - ${RECORDER_DIR}/logs:/app/logs
+      - ${RECORDER_DIR}/backup_config:/app/backup_config
     deploy:
       resources:
         limits:
-          memory: 1536M       # recorder peak 1.3G + ffmpeg + buffer (跟 systemd MemoryMax=1536M 对齐)
-          cpus: "1.5"         # 上游 ffmpeg 多 thread, 限制 1.5 核避免抢 GW
+          memory: 1536M
+          cpus: "1.5"
     networks:
       - content-pipeline-net
     depends_on:
       - content-pipeline-mcp
 
   # ─── v6-monitor (抖音账号监控 daemon, 6h 间隔) ─────────────────────────────
-  # TODO Day 1.2.4 — replaces SIGUSR1 signal handler with /api/run-now HTTP
   v6-monitor:
     build:
       context: ./services/v6-monitor
       dockerfile: Dockerfile
-    image: localhost:5000/content-pipeline/v6-monitor:0.1.0
+    image: ${REGISTRY_URL:-localhost:5000}/content-pipeline/v6-monitor:${IMAGE_TAG:-0.1.0}
     container_name: v6-monitor
     restart: unless-stopped
-    # 无端口 — v6-monitor 是 daemon, 无 HTTP 端点
-    # systemd 跑 24h loop, 容器跑 --once 由 restart policy 接管
     environment:
-      V6_WORKDIR: /home/main/douyin-data
+      V6_WORKDIR: ${DATA_DIR}
       MCP_URL: http://content-pipeline-mcp:18092/mcp
-      DOUYIN_COOKIE_PATH: /home/main/douyin-data/config/cookies
-      TZ: Asia/Shanghai
+      DOUYIN_COOKIE_PATH: ${DATA_DIR}/config/cookies
+      TZ: ${TZ:-Asia/Shanghai}
     env_file:
       - ./.env
     volumes:
-      # 主机磁盘是 source-of-truth, 容器只是 Python 解释器
-      # v6_monitor.py 需要 from douyin_api import (brand-video-tools 库)
-      # 需要 from v6_enqueue import (v6_pipeline 兄弟模块)
-      # 需要读 accounts.json + 写 state.db + download_list.json
-      - /home/main/douyin-data:/home/main/douyin-data
-      - /home/main/.openclaw/workspace/skills/brand-video-tools:/home/main/.openclaw/workspace/skills/brand-video-tools
+      - ${DATA_DIR}:${DATA_DIR}
+      - ${OPENCLAW_DIR}/workspace/skills/brand-video-tools:${OPENCLAW_DIR}/workspace/skills/brand-video-tools
     deploy:
       resources:
         limits:
-          memory: 200M         # 跟 systemd MemoryMax=200M
+          memory: 200M
           cpus: "0.5"
     networks:
       - content-pipeline-net
     depends_on:
       - content-pipeline-mcp
 
-  # ─── v6-enqueue (5 min cron 把 pending 一次性入队) ─────────────────────────────
+  # ─── v6-enqueue (cron-driven, sleep infinity + docker compose run --rm) ──────
   v6-enqueue:
     build:
       context: ./services/v6-enqueue
       dockerfile: Dockerfile
-    image: localhost:5000/content-pipeline/v6-enqueue:0.1.0
+    image: ${REGISTRY_URL:-localhost:5000}/content-pipeline/v6-enqueue:${IMAGE_TAG:-0.1.0}
     container_name: v6-enqueue
-    # 不 restart — enqueue 是 cron 驱动, 跑完即退
-    # 由 host cron 或 docker compose run 启动
     profiles: ["v6-workers"]
     environment:
-      V6_WORKDIR: /home/main/douyin-data
-      TZ: Asia/Shanghai
+      V6_WORKDIR: ${DATA_DIR}
+      TZ: ${TZ:-Asia/Shanghai}
     volumes:
-      - /home/main/douyin-data:/home/main/douyin-data
-      - /home/main/.openclaw/workspace/skills/brand-video-tools:/home/main/.openclaw/workspace/skills/brand-video-tools
+      - ${DATA_DIR}:${DATA_DIR}
+      - ${OPENCLAW_DIR}/workspace/skills/brand-video-tools:${OPENCLAW_DIR}/workspace/skills/brand-video-tools
     networks:
       - content-pipeline-net
 
-  # ─── v6-download (下载抖音 mp4, chromium fallback) ─────────────────────────────
+  # ─── v6-download (下载抖音 mp4, chromium fallback) ─────────────────────────
   v6-download:
     build:
       context: ./services/v6-download
       dockerfile: Dockerfile
-    image: localhost:5000/content-pipeline/v6-download:0.1.0
+    image: ${REGISTRY_URL:-localhost:5000}/content-pipeline/v6-download:${IMAGE_TAG:-0.1.0}
     container_name: v6-download
     restart: unless-stopped
     profiles: ["v6-workers"]
     environment:
-      V6_WORKDIR: /home/main/douyin-data
+      V6_WORKDIR: ${DATA_DIR}
       PLAYWRIGHT_BROWSERS_PATH: /ms-playwright
-      TZ: Asia/Shanghai
+      TZ: ${TZ:-Asia/Shanghai}
     volumes:
-      # 主机磁盘是 source-of-truth
-      - /home/main/douyin-data:/home/main/douyin-data
-      # chromium bind (host 已有, 不在 image 里)
-      - /home/main/.cache/ms-playwright:/ms-playwright
-      # brand-video-tools (v6_browser_fallback 引用)
-      - /home/main/.openclaw/workspace/skills/brand-video-tools:/home/main/.openclaw/workspace/skills/brand-video-tools
-      # douyin-batch (v6_base 引用)
-      - /home/main/.openclaw/workspace/skills/douyin-batch:/home/main/.openclaw/workspace/skills/douyin-batch
+      - ${DATA_DIR}:${DATA_DIR}
+      - ${PLAYWRIGHT_DIR}:/ms-playwright
+      - ${OPENCLAW_DIR}/workspace/skills/brand-video-tools:${OPENCLAW_DIR}/workspace/skills/brand-video-tools
+      - ${OPENCLAW_DIR}/workspace/skills/douyin-batch:${OPENCLAW_DIR}/workspace/skills/douyin-batch
     deploy:
       resources:
         limits:
-          memory: 1536M       # chromium 405MB + worker + buffer (铁律 168)
+          memory: 1536M
           cpus: "1.0"
     networks:
       - content-pipeline-net
 
-  # ─── v6-transcribe (HK ASR 转录, 调 host.docker.internal:18200) ─────────────────────────────
+  # ─── v6-transcribe (HK ASR 转录, 调 host.docker.internal:18200) ─────────────
   v6-transcribe:
     build:
       context: ./services/v6-transcribe
       dockerfile: Dockerfile
-    image: localhost:5000/content-pipeline/v6-transcribe:0.1.0
+    image: ${REGISTRY_URL:-localhost:5000}/content-pipeline/v6-transcribe:${IMAGE_TAG:-0.1.0}
     container_name: v6-transcribe
     restart: unless-stopped
     profiles: ["v6-workers"]
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
     environment:
-      V6_WORKDIR: /home/main/douyin-data
-      HK_ASR_URL: http://host.docker.internal:18200
-      TZ: Asia/Shanghai
+      V6_WORKDIR: ${DATA_DIR}
+      HK_ASR_URL: ${HK_ASR_URL:-http://host.docker.internal:18200}
+      TZ: ${TZ:-Asia/Shanghai}
     volumes:
-      - /home/main/douyin-data:/home/main/douyin-data
+      - ${DATA_DIR}:${DATA_DIR}
     networks:
       - content-pipeline-net
 
-  # ─── v6-distill (LLM 蒸馏 KB 卡片) ─────────────────────────────
+  # ─── v6-distill (LLM 蒸馏 KB 卡片) ──────────────────────────────────────────
   v6-distill:
     build:
       context: ./services/v6-distill
       dockerfile: Dockerfile
-    image: localhost:5000/content-pipeline/v6-distill:0.1.0
+    image: ${REGISTRY_URL:-localhost:5000}/content-pipeline/v6-distill:${IMAGE_TAG:-0.1.0}
     container_name: v6-distill
     restart: unless-stopped
     profiles: ["v6-workers"]
     environment:
-      V6_WORKDIR: /home/main/douyin-data
-      KB_DATA_DIR: /home/main/douyin-data/knowledge-base
-      TZ: Asia/Shanghai
+      V6_WORKDIR: ${DATA_DIR}
+      KB_DATA_DIR: ${DATA_DIR}/knowledge-base
+      TZ: ${TZ:-Asia/Shanghai}
     volumes:
-      - /home/main/douyin-data:/home/main/douyin-data
-      # knowledge-distill skill
-      - /home/main/.openclaw/workspace/skills/knowledge-distill:/home/main/.openclaw/workspace/skills/knowledge-distill
+      - ${DATA_DIR}:${DATA_DIR}
+      - ${OPENCLAW_DIR}/workspace/skills/knowledge-distill:${OPENCLAW_DIR}/workspace/skills/knowledge-distill
     networks:
       - content-pipeline-net
 
-  # ─── v6-upload (上传到 file-service, 调 host.docker.internal:18098) ─────────────────────────────
+  # ─── v6-upload (上传到 file-service, 走容器内部网络) ─────────────────────
   v6-upload:
     build:
       context: ./services/v6-upload
       dockerfile: Dockerfile
-    image: localhost:5000/content-pipeline/v6-upload:0.1.0
+    image: ${REGISTRY_URL:-localhost:5000}/content-pipeline/v6-upload:${IMAGE_TAG:-0.1.0}
     container_name: v6-upload
     restart: unless-stopped
     profiles: ["v6-workers"]
     environment:
-      V6_WORKDIR: /home/main/douyin-data
-      FILE_SERVICE_URL: http://host.docker.internal:18098
-      TZ: Asia/Shanghai
+      V6_WORKDIR: ${DATA_DIR}
+      # 走 docker compose 内部 DNS (service name), 不是 host.docker.internal
+      # host.docker.internal = docker host gateway 172.18.0.1, 那边的 :18098 是 systemd file-service, 不通
+      FILE_SERVICE_URL: ${FILE_SERVICE_URL:-http://file-service:18098}
+      TZ: ${TZ:-Asia/Shanghai}
     volumes:
-      - /home/main/douyin-data:/home/main/douyin-data
+      - ${DATA_DIR}:${DATA_DIR}
     networks:
       - content-pipeline-net
+    depends_on:
+      - file-service
 
 # ─── Networks ─────────────────────────────────────────────────────────────────
 networks:
@@ -255,6 +240,5 @@ networks:
     name: content-pipeline-net
     driver: bridge
 
-# ─── Volumes (持久化数据) ─────────────────────────────────────────────────────
 # SQLite queue.db 跨 worker 共享走 host volume (不做 named volume)
 volumes: {}

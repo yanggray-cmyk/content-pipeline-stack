@@ -22,7 +22,7 @@ RUN pip install --no-cache-dir \
 
 # Health check: 验证 queue.db 可读 + chromium 可调
 HEALTHCHECK --interval=60s --timeout=10s --start-period=30s --retries=3 \
-    CMD python -c "import sqlite3, os; sqlite3.connect('/data/queue.db').close(); assert os.path.isdir('/ms-playwright'), 'chromium not bind'; print('OK')" || exit 1
+    CMD python -c "import sqlite3, os, os; sqlite3.connect(os.environ.get('V6_WORKDIR', '/data') + '/queue.db').close(); assert os.path.isdir('/ms-playwright'), 'chromium not bind'; print('OK')" || exit 1
 
 ENV PLAYWRIGHT_BROWSERS_PATH=/ms-playwright
 

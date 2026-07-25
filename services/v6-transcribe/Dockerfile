@@ -15,7 +15,7 @@ FROM ghcr.io/main-1/content-pipeline/v6-base:0.1.0
 
 # Health check: 验证 HK ASR 联通 (经 host.docker.internal)
 HEALTHCHECK --interval=60s --timeout=15s --start-period=20s --retries=3 \
-    CMD curl -sf http://host.docker.internal:18200/health || exit 1
+    CMD curl -sf "${HK_ASR_URL:-http://host.docker.internal:18200}/health" || exit 1
 
 ENV HK_ASR_URL=http://host.docker.internal:18200
 

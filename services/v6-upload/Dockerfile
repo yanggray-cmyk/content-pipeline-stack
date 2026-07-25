@@ -15,8 +15,8 @@ FROM ghcr.io/main-1/content-pipeline/v6-base:0.1.0
 
 # Health check: 验证 file-service 联通 + uploads dir 可写
 HEALTHCHECK --interval=60s --timeout=15s --start-period=20s --retries=3 \
-    CMD curl -sf http://host.docker.internal:18098/health && \
-        python -c "import os; os.makedirs('/data/uploads-migrated', exist_ok=True); print('uploads dir OK')" || exit 1
+    CMD curl -sf "http://${FILE_SERVICE_URL_HOST:-file-service}:${FILE_SERVICE_PORT:-18098}/health" && \
+        python -c "import os; os.makedirs(os.environ.get('UPLOADS_DIR', '/data/uploads'), exist_ok=True); print('uploads dir OK')" || exit 1
 
 ENV FILE_SERVICE_URL=http://host.docker.internal:18098
 
