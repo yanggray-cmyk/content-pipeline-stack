@@ -144,6 +144,111 @@ services:
     depends_on:
       - content-pipeline-mcp
 
+  # ─── v6-enqueue (5 min cron 把 pending 一次性入队) ─────────────────────────────
+  v6-enqueue:
+    build:
+      context: ./services/v6-enqueue
+      dockerfile: Dockerfile
+    image: ghcr.io/main-1/content-pipeline/v6-enqueue:0.1.0
+    container_name: v6-enqueue
+    # 不 restart — enqueue 是 cron 驱动, 跑完即退
+    # 由 host cron 或 docker compose run 启动
+    profiles: ["v6-workers"]
+    environment:
+      V6_WORKDIR: /home/main/douyin-data
+      TZ: Asia/Shanghai
+    volumes:
+      - /home/main/douyin-data:/home/main/douyin-data
+      - /home/main/.openclaw/workspace/skills/brand-video-tools:/home/main/.openclaw/workspace/skills/brand-video-tools
+    networks:
+      - content-pipeline-net
+
+  # ─── v6-download (下载抖音 mp4, chromium fallback) ─────────────────────────────
+  v6-download:
+    build:
+      context: ./services/v6-download
+      dockerfile: Dockerfile
+    image: ghcr.io/main-1/content-pipeline/v6-download:0.1.0
+    container_name: v6-download
+    restart: unless-stopped
+    profiles: ["v6-workers"]
+    environment:
+      V6_WORKDIR: /home/main/douyin-data
+      PLAYWRIGHT_BROWSERS_PATH: /ms-playwright
+      TZ: Asia/Shanghai
+    volumes:
+      # 主机磁盘是 source-of-truth
+      - /home/main/douyin-data:/home/main/douyin-data
+      # chromium bind (host 已有, 不在 image 里)
+      - /home/main/.cache/ms-playwright:/ms-playwright
+      # brand-video-tools (v6_browser_fallback 引用)
+      - /home/main/.openclaw/workspace/skills/brand-video-tools:/home/main/.openclaw/workspace/skills/brand-video-tools
+      # douyin-batch (v6_base 引用)
+      - /home/main/.openclaw/workspace/skills/douyin-batch:/home/main/.openclaw/workspace/skills/douyin-batch
+    deploy:
+      resources:
+        limits:
+          memory: 1536M       # chromium 405MB + worker + buffer (铁律 168)
+          cpus: "1.0"
+    networks:
+      - content-pipeline-net
+
+  # ─── v6-transcribe (HK ASR 转录, 调 host.docker.internal:18200) ─────────────────────────────
+  v6-transcribe:
+    build:
+      context: ./services/v6-transcribe
+      dockerfile: Dockerfile
+    image: ghcr.io/main-1/content-pipeline/v6-transcribe:0.1.0
+    container_name: v6-transcribe
+    restart: unless-stopped
+    profiles: ["v6-workers"]
+    environment:
+      V6_WORKDIR: /home/main/douyin-data
+      HK_ASR_URL: http://host.docker.internal:18200
+      TZ: Asia/Shanghai
+    volumes:
+      - /home/main/douyin-data:/home/main/douyin-data
+    networks:
+      - content-pipeline-net
+
+  # ─── v6-distill (LLM 蒸馏 KB 卡片) ─────────────────────────────
+  v6-distill:
+    build:
+      context: ./services/v6-distill
+      dockerfile: Dockerfile
+    image: ghcr.io/main-1/content-pipeline/v6-distill:0.1.0
+    container_name: v6-distill
+    restart: unless-stopped
+    profiles: ["v6-workers"]
+    environment:
+      V6_WORKDIR: /home/main/douyin-data
+      KB_DATA_DIR: /home/main/douyin-data/knowledge-base
+      TZ: Asia/Shanghai
+    volumes:
+      - /home/main/douyin-data:/home/main/douyin-data
+      # knowledge-distill skill
+      - /home/main/.openclaw/workspace/skills/knowledge-distill:/home/main/.openclaw/workspace/skills/knowledge-distill
+    networks:
+      - content-pipeline-net
+
+  # ─── v6-upload (上传到 file-service, 调 host.docker.internal:18098) ─────────────────────────────
+  v6-upload:
+    build:
+      context: ./services/v6-upload
+      dockerfile: Dockerfile
+    image: ghcr.io/main-1/content-pipeline/v6-upload:0.1.0
+    container_name: v6-upload
+    restart: unless-stopped
+    profiles: ["v6-workers"]
+    environment:
+      V6_WORKDIR: /home/main/douyin-data
+      FILE_SERVICE_URL: http://host.docker.internal:18098
+      TZ: Asia/Shanghai
+    volumes:
+      - /home/main/douyin-data:/home/main/douyin-data
+    networks:
+      - content-pipeline-net
+
 # ─── Networks ─────────────────────────────────────────────────────────────────
 networks:
   content-pipeline-net:
