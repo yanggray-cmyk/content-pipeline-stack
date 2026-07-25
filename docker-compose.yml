@@ -112,6 +112,38 @@ services:
     depends_on:
       - content-pipeline-mcp
 
+  # ─── douyin-recorder (DouyinLiveRecorder upstream, ffmpeg + nodejs 抖音签名) ─────────────────────────────
+  douyin-recorder:
+    build:
+      context: ./services/douyin-recorder/source
+      dockerfile: ../Dockerfile
+    image: ghcr.io/main-1/content-pipeline/douyin-recorder:0.1.0
+    container_name: douyin-recorder
+    restart: unless-stopped
+    # 无端口 — recorder 不暴露 HTTP
+    # stdin_open + tty: docker exec 进容器调试
+    stdin_open: true
+    tty: true
+    environment:
+      TZ: Asia/Shanghai
+      PYTHONUNBUFFERED: "1"
+    volumes:
+      # 主机磁盘是 source-of-truth (config.ini 含 cookie + URL_config.ini 直播间列表)
+      # downloads/logs/backup_config 也 bind → 容器跟 systemd 共享同一份 (9G 输出)
+      - /home/main/DouyinLiveRecorder/config:/app/config
+      - /home/main/DouyinLiveRecorder/downloads:/app/downloads
+      - /home/main/DouyinLiveRecorder/logs:/app/logs
+      - /home/main/DouyinLiveRecorder/backup_config:/app/backup_config
+    deploy:
+      resources:
+        limits:
+          memory: 1536M       # recorder peak 1.3G + ffmpeg + buffer (跟 systemd MemoryMax=1536M 对齐)
+          cpus: "1.5"         # 上游 ffmpeg 多 thread, 限制 1.5 核避免抢 GW
+    networks:
+      - content-pipeline-net
+    depends_on:
+      - content-pipeline-mcp
+
   # ─── v6-monitor (抖音账号监控 daemon, 6h 间隔) ─────────────────────────────
   # TODO Day 1.2.4 — replaces SIGUSR1 signal handler with /api/run-now HTTP
   v6-monitor:
