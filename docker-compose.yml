@@ -52,8 +52,9 @@ services:
     image: ghcr.io/main-1/content-pipeline/file-service:0.1.0
     container_name: file-service
     restart: unless-stopped
+    # 错位端口: 容器 18098 ↔ host 28098 (systemd 18098 不停)
     ports:
-      - "18098:18098"
+      - "28098:18098"
     environment:
       NODE_ENV: production
       PORT: "18098"
@@ -62,6 +63,10 @@ services:
       - ./.env
     volumes:
       - /home/main/douyin-data:/home/main/douyin-data
+      # server.js 需要读写 uploads (上传/下载) + .openclaw/data (audit log)
+      # 如跟 systemd 共存, bind 同一份主备数据, 双向同步
+      - /home/main/uploads:/home/main/uploads
+      - /home/main/.openclaw:/home/main/.openclaw
     deploy:
       resources:
         limits:

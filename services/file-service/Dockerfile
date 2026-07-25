@@ -39,7 +39,9 @@ COPY lib/ ./lib/
 COPY index.html videos.html ./
 COPY videos.html.bak ./
 
-USER node
+# UID/GID 1001:1001 = host 'main' user (磁盘 owner)
+# 不用 alpine 'node' (uid 1000): uid 1000 不匹配磁盘 owner, EACCES
+USER 1001:1001
 
 EXPOSE 18098
 
