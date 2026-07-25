@@ -11,7 +11,7 @@
 ```bash
 # 1. 构建镜像
 docker build \
-  -t ghcr.io/main-1/content-pipeline/content-pipeline-mcp:0.1.0 \
+  -t ghcr.io/main-1/content-pipeline-stack/content-pipeline-mcp:0.1.0 \
   -f services/content-pipeline-mcp/Dockerfile \
   services/content-pipeline-mcp
 
@@ -28,7 +28,7 @@ docker run -d \
   -p 18092:18092 \
   --env-file .env \
   -v /home/main/douyin-data:/home/main/douyin-data:ro \
-  ghcr.io/main-1/content-pipeline/content-pipeline-mcp:0.1.0
+  ghcr.io/main-1/content-pipeline-stack/content-pipeline-mcp:0.1.0
 
 # 4. 健康检查
 curl -fsS http://127.0.0.1:18092/health

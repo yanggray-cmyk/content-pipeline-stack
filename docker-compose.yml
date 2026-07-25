@@ -10,7 +10,7 @@ services:
     build:
       context: ./services/content-pipeline-mcp
       dockerfile: Dockerfile
-    image: ${REGISTRY_URL:-localhost:5000}/content-pipeline/content-pipeline-mcp:${IMAGE_TAG:-0.1.0}
+    image: ${REGISTRY_URL:-localhost:5000}/content-pipeline-stack/content-pipeline-mcp:${IMAGE_TAG:-0.1.0}
     container_name: content-pipeline-mcp
     restart: unless-stopped
     ports:
@@ -49,7 +49,7 @@ services:
     build:
       context: ./services/file-service
       dockerfile: Dockerfile
-    image: ${REGISTRY_URL:-localhost:5000}/content-pipeline/file-service:${IMAGE_TAG:-0.1.0}
+    image: ${REGISTRY_URL:-localhost:5000}/content-pipeline-stack/file-service:${IMAGE_TAG:-0.1.0}
     container_name: file-service
     restart: unless-stopped
     ports:
@@ -76,10 +76,11 @@ services:
 
   # ─── douyin-recorder (DouyinLiveRecorder upstream, ffmpeg + nodejs) ─────────
   douyin-recorder:
+    profiles: ["v6-workers"]
     build:
       context: ./services/douyin-recorder/source
       dockerfile: ../Dockerfile
-    image: ${REGISTRY_URL:-localhost:5000}/content-pipeline/douyin-recorder:${IMAGE_TAG:-0.1.0}
+    image: ${REGISTRY_URL:-localhost:5000}/content-pipeline-stack/douyin-recorder:${IMAGE_TAG:-0.1.0}
     container_name: douyin-recorder
     restart: unless-stopped
     stdin_open: true
@@ -107,7 +108,7 @@ services:
     build:
       context: ./services/v6-monitor
       dockerfile: Dockerfile
-    image: ${REGISTRY_URL:-localhost:5000}/content-pipeline/v6-monitor:${IMAGE_TAG:-0.1.0}
+    image: ${REGISTRY_URL:-localhost:5000}/content-pipeline-stack/v6-monitor:${IMAGE_TAG:-0.1.0}
     container_name: v6-monitor
     restart: unless-stopped
     environment:
@@ -135,7 +136,7 @@ services:
     build:
       context: ./services/v6-enqueue
       dockerfile: Dockerfile
-    image: ${REGISTRY_URL:-localhost:5000}/content-pipeline/v6-enqueue:${IMAGE_TAG:-0.1.0}
+    image: ${REGISTRY_URL:-localhost:5000}/content-pipeline-stack/v6-enqueue:${IMAGE_TAG:-0.1.0}
     container_name: v6-enqueue
     profiles: ["v6-workers"]
     environment:
@@ -152,7 +153,7 @@ services:
     build:
       context: ./services/v6-download
       dockerfile: Dockerfile
-    image: ${REGISTRY_URL:-localhost:5000}/content-pipeline/v6-download:${IMAGE_TAG:-0.1.0}
+    image: ${REGISTRY_URL:-localhost:5000}/content-pipeline-stack/v6-download:${IMAGE_TAG:-0.1.0}
     container_name: v6-download
     restart: unless-stopped
     profiles: ["v6-workers"]
@@ -178,7 +179,7 @@ services:
     build:
       context: ./services/v6-transcribe
       dockerfile: Dockerfile
-    image: ${REGISTRY_URL:-localhost:5000}/content-pipeline/v6-transcribe:${IMAGE_TAG:-0.1.0}
+    image: ${REGISTRY_URL:-localhost:5000}/content-pipeline-stack/v6-transcribe:${IMAGE_TAG:-0.1.0}
     container_name: v6-transcribe
     restart: unless-stopped
     profiles: ["v6-workers"]
@@ -198,7 +199,7 @@ services:
     build:
       context: ./services/v6-distill
       dockerfile: Dockerfile
-    image: ${REGISTRY_URL:-localhost:5000}/content-pipeline/v6-distill:${IMAGE_TAG:-0.1.0}
+    image: ${REGISTRY_URL:-localhost:5000}/content-pipeline-stack/v6-distill:${IMAGE_TAG:-0.1.0}
     container_name: v6-distill
     restart: unless-stopped
     profiles: ["v6-workers"]
@@ -217,7 +218,7 @@ services:
     build:
       context: ./services/v6-upload
       dockerfile: Dockerfile
-    image: ${REGISTRY_URL:-localhost:5000}/content-pipeline/v6-upload:${IMAGE_TAG:-0.1.0}
+    image: ${REGISTRY_URL:-localhost:5000}/content-pipeline-stack/v6-upload:${IMAGE_TAG:-0.1.0}
     container_name: v6-upload
     restart: unless-stopped
     profiles: ["v6-workers"]
