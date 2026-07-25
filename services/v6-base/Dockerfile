@@ -26,6 +26,26 @@ LABEL maintainer="main-agent" \
 RUN apt-get update && apt-get install -y --no-install-recommends \
         tini \
         curl \
+        # 铁律 178 (2026-07-26 03:50 main 反思): chromium 容器化需装系统 lib
+        # bookworm-slim 不预装 chrome-headless-shell 依赖 (libglib/libgobject/libnspr/libnss ...)
+        libglib2.0-0 \
+        libgobject-2.0-0 \
+        libnspr4 \
+        libnss3 \
+        libdbus-1-3 \
+        libatk1.0-0 \
+        libatk-bridge2.0-0 \
+        libcups2 \
+        libdrm2 \
+        libxcomposite1 \
+        libxdamage1 \
+        libxfixes3 \
+        libxrandr2 \
+        libgbm1 \
+        libxkbcommon0 \
+        libpango-1.0-0 \
+        libcairo2 \
+        libasound2 \
     && rm -rf /var/lib/apt/lists/*
 
 # pip 依赖 (跟 systemd worker 一致, 避免行为漂移)
