@@ -59,6 +59,10 @@ Dockerfile.local
 **/cookies/*.txt
 **/browser_fallback_stats.json
 
+# Config files (may contain credentials)
+services/douyin-recorder/source/config/*.ini
+services/douyin-recorder/source/config/*.bak*
+
 # video / downloads (don't accidentally git add huge files)
 downloads/
 **/*.mp4
