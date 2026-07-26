@@ -52,8 +52,8 @@ from datetime import datetime
 from pathlib import Path
 
 # === 路径配置 ===
-WORKDIR = Path(os.environ.get("V6_WORKDIR", "/home/main/douyin-data"))
-ACCOUNTS_FILE = Path("/home/main/douyin-data/config/accounts.json")
+WORKDIR = Path(os.environ.get("V6_WORKDIR", "./data"))
+ACCOUNTS_FILE = Path(os.environ.get("V6_ACCOUNTS_FILE", str(WORKDIR / "config" / "accounts.json")))
 STATE_DB = WORKDIR / "monitor_state.db"
 LOG_FILE = WORKDIR / "logs" / "v6_monitor.log"
 
@@ -140,7 +140,7 @@ async def fetch_user_posts(sec_user_id: str, max_counts: int = 50) -> list:
 
     复用 monitor_douyin.py 的 douyin_api (brand-video-tools)
     """
-    BRAND_VIDEO_ROOT = Path("/home/main/.openclaw/workspace/skills/brand-video-tools")
+    BRAND_VIDEO_ROOT = Path(os.environ.get("BRAND_VIDEO_ROOT", "/opt/brand-video-tools"))
     sys.path.insert(0, str(BRAND_VIDEO_ROOT / "scripts"))
     try:
         from douyin_api import fetch_user_posts as _fetch_user_posts
