@@ -37,6 +37,95 @@ def get_quality_index(quality) -> tuple:
     return quality_str, QUALITY_MAPPING.get(quality_str, 0)
 
 
+def _pad_to_five(url_list: list) -> list:
+    """不足 5 项时用最后一项填充（质量索引固定 0-4）"""
+    while len(url_list) < 5:
+        url_list.append(url_list[-1])
+    return url_list
+
+
+def _tiktok_get_video_quality_url(stream: dict, q_key: str) -> list:
+    """解析 TikTok 流地址，按码率+分辨率降序"""
+    play_list = []
+    for key in stream:
+        url_info = stream[key]['main']
+        sdk_params = json.loads(url_info['sdk_params'])
+        vbitrate = int(sdk_params['vbitrate'])
+        v_codec = sdk_params.get('VCodec', '')
+
+        play_url = ''
+        if url_info.get(q_key):
+            if url_info[q_key].endswith(".flv") or url_info[q_key].endswith(".m3u8"):
+                play_url = url_info[q_key] + '?codec=' + v_codec
+            else:
+                play_url = url_info[q_key] + '&codec=' + v_codec
+
+        resolution = sdk_params['resolution']
+        if vbitrate != 0 and resolution:
+            width, height = map(int, resolution.split('x'))
+            play_list.append({'url': play_url, 'vbitrate': vbitrate, 'resolution': (width, height)})
+
+    play_list.sort(key=itemgetter('vbitrate'), reverse=True)
+    play_list.sort(key=lambda x: (-x['vbitrate'], -x['resolution'][0], -x['resolution'][1]))
+    return play_list
+
+
+def _huya_get_anti_code(old_anti_code: str, stream_name: str) -> str:
+    """生成虎牙 anti_code 签名
+
+    js地址：https://hd.huya.com/cdn_libs/mobile/hysdk-m-202402211431.js
+    """
+    params_t = 100
+    sdk_version = 2403051612
+
+    t13 = int(time.time()) * 1000
+    sdk_sid = t13
+
+    init_uuid = (int(t13 % 10 ** 10 * 1000) + int(1000 * random.random())) % 4294967295
+    uid = random.randint(1400000000000, 1400009999999)
+    seq_id = uid + sdk_sid
+
+    target_unix_time = (t13 + 110624) // 1000
+    ws_time = f"{target_unix_time:x}".lower()
+
+    url_query = urllib.parse.parse_qs(old_anti_code)
+    ws_secret_pf = base64.b64decode(urllib.parse.unquote(url_query['fm'][0]).encode()).decode().split("_")[0]
+    ws_secret_hash = hashlib.md5(f'{seq_id}|{url_query["ctype"][0]}|{params_t}'.encode()).hexdigest()
+    ws_secret = f'{ws_secret_pf}_{uid}_{stream_name}_{ws_secret_hash}_{ws_time}'
+    ws_secret_md5 = hashlib.md5(ws_secret.encode()).hexdigest()
+
+    return (
+        f'wsSecret={ws_secret_md5}&wsTime={ws_time}&seqid={seq_id}&ctype={url_query["ctype"][0]}&ver=1'
+        f'&fs={url_query["fs"][0]}&uuid={init_uuid}&u={uid}&t={params_t}&sv={sdk_version}'
+        f'&sdk_sid={sdk_sid}&codec=264'
+    )
+
+
+def _huya_apply_quality(flv_url: str, m3u8_url: str, flv_anti_code: str, video_quality: str) -> tuple:
+    """虎牙按质量档位拼接 ratio 参数"""
+    quality_list = flv_anti_code.split('&exsphd=')
+    if len(quality_list) <= 1 or video_quality in ["OD", "BD"]:
+        return flv_url, m3u8_url
+
+    pattern = r"(?<=264_)\d+"
+    quality_list = list(re.findall(pattern, quality_list[1]))[::-1]
+    quality_list = _pad_to_five(quality_list)
+
+    video_quality_options = {
+        "UHD": quality_list[0],
+        "HD": quality_list[1],
+        "SD": quality_list[2],
+        "LD": quality_list[3]
+    }
+
+    if video_quality not in video_quality_options:
+        raise ValueError(
+            f"Invalid video quality. Available options are: {', '.join(video_quality_options.keys())}")
+
+    ratio = str(video_quality_options[video_quality])
+    return flv_url + ratio, m3u8_url + ratio
+
+
 @trace_error_decorator
 async def get_douyin_stream_url(json_data: dict, video_quality: str, proxy_addr: str) -> dict:
     anchor_name = json_data.get('anchor_name')
@@ -83,31 +172,6 @@ async def get_tiktok_stream_url(json_data: dict, video_quality: str, proxy_addr:
     if not json_data:
         return {"anchor_name": None, "is_live": False}
 
-    def get_video_quality_url(stream, q_key) -> list:
-        play_list = []
-        for key in stream:
-            url_info = stream[key]['main']
-            sdk_params = url_info['sdk_params']
-            sdk_params = json.loads(sdk_params)
-            vbitrate = int(sdk_params['vbitrate'])
-            v_codec = sdk_params.get('VCodec', '')
-
-            play_url = ''
-            if url_info.get(q_key):
-                if url_info[q_key].endswith(".flv") or url_info[q_key].endswith(".m3u8"):
-                    play_url = url_info[q_key] + '?codec=' + v_codec
-                else:
-                    play_url = url_info[q_key] + '&codec=' + v_codec
-
-            resolution = sdk_params['resolution']
-            if vbitrate != 0 and resolution:
-                width, height = map(int, resolution.split('x'))
-                play_list.append({'url': play_url, 'vbitrate': vbitrate, 'resolution': (width, height)})
-
-        play_list.sort(key=itemgetter('vbitrate'), reverse=True)
-        play_list.sort(key=lambda x: (-x['vbitrate'], -x['resolution'][0], -x['resolution'][1]))
-        return play_list
-
     live_room = json_data['LiveRoom']['liveRoomUserInfo']
     user = live_room['user']
     anchor_name = f"{user['nickname']}-{user['uniqueId']}"
@@ -121,13 +185,9 @@ async def get_tiktok_stream_url(json_data: dict, video_quality: str, proxy_addr:
     if status == 2:
         stream_data = live_room['liveRoom']['streamData']['pull_data']['stream_data']
         stream_data = json.loads(stream_data).get('data', {})
-        flv_url_list = get_video_quality_url(stream_data, 'flv')
-        m3u8_url_list = get_video_quality_url(stream_data, 'hls')
+        flv_url_list = _pad_to_five(_tiktok_get_video_quality_url(stream_data, 'flv'))
+        m3u8_url_list = _pad_to_five(_tiktok_get_video_quality_url(stream_data, 'hls'))
 
-        while len(flv_url_list) < 5:
-            flv_url_list.append(flv_url_list[-1])
-        while len(m3u8_url_list) < 5:
-            m3u8_url_list.append(m3u8_url_list[-1])
         video_quality, quality_index = get_quality_index(video_quality)
         flv_dict: dict = flv_url_list[quality_index]
         m3u8_dict: dict = m3u8_url_list[quality_index]
@@ -166,44 +226,42 @@ async def get_kuaishou_stream_url(json_data: dict, video_quality: str) -> dict:
     }
 
     if live_status:
-        quality_mapping_bit = {'OD': 99999, 'BD': 4000, 'UHD': 2000, 'HD': 1000, 'SD': 800, 'LD': 600}
         if video_quality in QUALITY_MAPPING:
-
             quality, quality_index = get_quality_index(video_quality)
             if 'm3u8_url_list' in json_data:
-                m3u8_url_list = json_data['m3u8_url_list'][::-1]
-                while len(m3u8_url_list) < 5:
-                    m3u8_url_list.append(m3u8_url_list[-1])
-                m3u8_url = m3u8_url_list[quality_index]['url']
-                result['m3u8_url'] = m3u8_url
+                m3u8_url_list = _pad_to_five(json_data['m3u8_url_list'][::-1])
+                result['m3u8_url'] = m3u8_url_list[quality_index]['url']
 
             if 'flv_url_list' in json_data:
                 if 'bitrate' in json_data['flv_url_list'][0]:
-                    flv_url_list = json_data['flv_url_list']
-                    flv_url_list = sorted(flv_url_list, key=lambda x: x['bitrate'], reverse=True)
-                    quality_str = str(video_quality).upper()
-                    if quality_str.isdigit():
-                        video_quality, quality_index_bitrate_value = list(quality_mapping_bit.items())[int(quality_str)]
-                    else:
-                        quality_index_bitrate_value = quality_mapping_bit.get(quality_str, 99999)
-                        video_quality = quality_str
-                    quality_index = next(
-                        (i for i, x in enumerate(flv_url_list) if x['bitrate'] <= quality_index_bitrate_value), None)
-                    if quality_index is None:
-                        quality_index = len(flv_url_list) - 1
-                    flv_url = flv_url_list[quality_index]['url']
-
+                    flv_url, video_quality = _kuaishou_select_flv_by_bitrate(
+                        json_data['flv_url_list'], video_quality)
                     result['flv_url'] = flv_url
                     result['record_url'] = flv_url
                 else:
-                    flv_url_list = json_data['flv_url_list'][::-1]
-                    while len(flv_url_list) < 5:
-                        flv_url_list.append(flv_url_list[-1])
+                    flv_url_list = _pad_to_five(json_data['flv_url_list'][::-1])
                     flv_url = flv_url_list[quality_index]['url']
                     result |= {'flv_url': flv_url, 'record_url': flv_url}
             result['is_live'] = True
             result['quality'] = video_quality
     return result
+
+
+def _kuaishou_select_flv_by_bitrate(flv_url_list: list, video_quality: str) -> tuple:
+    """快手按 bitrate 选择最接近的质量档位，返回 (flv_url, video_quality)"""
+    quality_mapping_bit = {'OD': 99999, 'BD': 4000, 'UHD': 2000, 'HD': 1000, 'SD': 800, 'LD': 600}
+    flv_url_list = sorted(flv_url_list, key=lambda x: x['bitrate'], reverse=True)
+    quality_str = str(video_quality).upper()
+    if quality_str.isdigit():
+        video_quality, quality_index_bitrate_value = list(quality_mapping_bit.items())[int(quality_str)]
+    else:
+        quality_index_bitrate_value = quality_mapping_bit.get(quality_str, 99999)
+        video_quality = quality_str
+    quality_index = next(
+        (i for i, x in enumerate(flv_url_list) if x['bitrate'] <= quality_index_bitrate_value), None)
+    if quality_index is None:
+        quality_index = len(flv_url_list) - 1
+    return flv_url_list[quality_index]['url'], video_quality
 
 
 @trace_error_decorator
@@ -220,73 +278,14 @@ async def get_huya_stream_url(json_data: dict, video_quality: str) -> dict:
 
     if stream_info_list:
         select_cdn = stream_info_list[0]
-        flv_url = select_cdn.get('sFlvUrl')
         stream_name = select_cdn.get('sStreamName')
-        flv_url_suffix = select_cdn.get('sFlvUrlSuffix')
-        hls_url = select_cdn.get('sHlsUrl')
-        hls_url_suffix = select_cdn.get('sHlsUrlSuffix')
         flv_anti_code = select_cdn.get('sFlvAntiCode')
 
-        def get_anti_code(old_anti_code: str) -> str:
+        new_anti_code = _huya_get_anti_code(flv_anti_code, stream_name)
+        flv_url = f"{select_cdn.get('sFlvUrl')}/{stream_name}.{select_cdn.get('sFlvUrlSuffix')}?{new_anti_code}&ratio="
+        m3u8_url = f"{select_cdn.get('sHlsUrl')}/{stream_name}.{select_cdn.get('sHlsUrlSuffix')}?{new_anti_code}&ratio="
 
-            # js地址：https://hd.huya.com/cdn_libs/mobile/hysdk-m-202402211431.js
-
-            params_t = 100
-            sdk_version = 2403051612
-
-            # sdk_id是13位数毫秒级时间戳
-            t13 = int(time.time()) * 1000
-            sdk_sid = t13
-
-            # 计算uuid和uid参数值
-            init_uuid = (int(t13 % 10 ** 10 * 1000) + int(1000 * random.random())) % 4294967295  # 直接初始化
-            uid = random.randint(1400000000000, 1400009999999)  # 经过测试uid也可以使用init_uuid代替
-            seq_id = uid + sdk_sid  # 移动端请求的直播流地址中包含seqId参数
-
-            # 计算ws_time参数值(16进制) 可以是当前毫秒时间戳，当然也可以直接使用url_query['wsTime'][0]
-            # 原始最大误差不得慢240000毫秒
-            target_unix_time = (t13 + 110624) // 1000
-            ws_time = f"{target_unix_time:x}".lower()
-
-            # fm参数值是经过url编码然后base64编码得到的，解码结果类似 DWq8BcJ3h6DJt6TY_$0_$1_$2_$3
-            # 具体细节在上面js中查看，大概在32657行代码开始，有base64混淆代码请自行替换
-            url_query = urllib.parse.parse_qs(old_anti_code)
-            ws_secret_pf = base64.b64decode(urllib.parse.unquote(url_query['fm'][0]).encode()).decode().split("_")[0]
-            ws_secret_hash = hashlib.md5(f'{seq_id}|{url_query["ctype"][0]}|{params_t}'.encode()).hexdigest()
-            ws_secret = f'{ws_secret_pf}_{uid}_{stream_name}_{ws_secret_hash}_{ws_time}'
-            ws_secret_md5 = hashlib.md5(ws_secret.encode()).hexdigest()
-
-            anti_code = (
-                f'wsSecret={ws_secret_md5}&wsTime={ws_time}&seqid={seq_id}&ctype={url_query["ctype"][0]}&ver=1'
-                f'&fs={url_query["fs"][0]}&uuid={init_uuid}&u={uid}&t={params_t}&sv={sdk_version}'
-                f'&sdk_sid={sdk_sid}&codec=264'
-            )
-            return anti_code
-
-        new_anti_code = get_anti_code(flv_anti_code)
-        flv_url = f'{flv_url}/{stream_name}.{flv_url_suffix}?{new_anti_code}&ratio='
-        m3u8_url = f'{hls_url}/{stream_name}.{hls_url_suffix}?{new_anti_code}&ratio='
-
-        quality_list = flv_anti_code.split('&exsphd=')
-        if len(quality_list) > 1 and video_quality not in ["OD", "BD"]:
-            pattern = r"(?<=264_)\d+"
-            quality_list = list(re.findall(pattern, quality_list[1]))[::-1]
-            while len(quality_list) < 5:
-                quality_list.append(quality_list[-1])
-
-            video_quality_options = {
-                "UHD": quality_list[0],
-                "HD": quality_list[1],
-                "SD": quality_list[2],
-                "LD": quality_list[3]
-            }
-
-            if video_quality not in video_quality_options:
-                raise ValueError(
-                    f"Invalid video quality. Available options are: {', '.join(video_quality_options.keys())}")
-
-            flv_url = flv_url + str(video_quality_options[video_quality])
-            m3u8_url = m3u8_url + str(video_quality_options[video_quality])
+        flv_url, m3u8_url = _huya_apply_quality(flv_url, m3u8_url, flv_anti_code, video_quality)
 
         result |= {
             'is_live': True,
