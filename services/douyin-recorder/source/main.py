@@ -38,12 +38,62 @@ from ffmpeg_install import (
     check_ffmpeg, ffmpeg_path, current_env_path
 )
 
+class RecordingContext:
+    """录制上下文 - 封装所有状态变量，消除全局变量"""
+    
+    def __init__(self):
+        # 录制状态
+        self.recording = set()
+        self.recording_time_list = {}
+        
+        # 错误计数
+        self.error_count = 0
+        self.error_window = []
+        self.error_window_size = 10
+        self.error_threshold = 5
+        
+        # 并发控制
+        self.pre_max_request = 10
+        self.max_request_lock = threading.Lock()
+        
+        # 监控状态
+        self.monitoring = 0
+        self.running_list = []
+        
+        # URL 配置
+        self.url_tuples_list = []
+        self.url_comments = []
+        self.text_no_repeat_url = []
+        
+        # 启动标志
+        self.first_start = True
+        self.first_run = True
+        self.exit_recording = False
+        
+        # 更新队列
+        self.need_update_line_list = []
+        self.not_record_list = []
+        
+        # 时间记录
+        self.start_display_time = datetime.datetime.now()
+        
+        # 代理配置
+        self.global_proxy = False
+        
+        # 文件操作锁
+        self.file_update_lock = threading.Lock()
+
+
 version = "v4.0.7"
 platforms = ("\n国内站点：抖音|快手|虎牙|斗鱼|YY|B站|小红书|bigo|blued|网易CC|千度热播|猫耳FM|Look|TwitCasting|百度|微博|"
              "酷狗|花椒|流星|Acfun|畅聊|映客|音播|知乎|嗨秀|VV星球|17Live|浪Live|漂漂|六间房|乐嗨|花猫|淘宝|京东|咪咕|连接|来秀"
              "\n海外站点：TikTok|SOOP|PandaTV|WinkTV|FlexTV|PopkonTV|TwitchTV|LiveMe|ShowRoom|CHZZK|Shopee|"
              "Youtube|Faceit|Picarto")
 
+# 全局录制上下文实例
+ctx = RecordingContext()
+
+# 保留原有全局变量（后续逐步替换）
 recording = set()
 error_count = 0
 pre_max_request = 10
