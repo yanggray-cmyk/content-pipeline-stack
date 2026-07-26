@@ -13,10 +13,11 @@
 
 FROM ghcr.io/main-1/content-pipeline/v6-base:0.1.0
 
-# Health check: 验证 file-service 联通 + uploads dir 可写
+# Health check: 验证 file-service 联通 + python worker 在走 (不创 uploads/ 不靠谱)
+# 铁律 179 (2026-07-26 12:18 Cove 拍板根治): bookworm-slim 不预装 pgrep, 用 /proc cmdline 自检
 HEALTHCHECK --interval=60s --timeout=15s --start-period=20s --retries=3 \
     CMD curl -sf "http://${FILE_SERVICE_URL_HOST:-file-service}:${FILE_SERVICE_PORT:-18098}/health" && \
-        python -c "import os; os.makedirs(os.environ.get('UPLOADS_DIR', '/data/uploads'), exist_ok=True); print('uploads dir OK')" || exit 1
+        python -c "import os; [exit(0) for p in os.listdir('/proc') if p.isdigit() and b'v6_upload_worker.py' in open(f'/proc/{p}/cmdline','rb').read()]; exit(1)" || exit 1
 
 ENV FILE_SERVICE_URL=http://host.docker.internal:18098
 
