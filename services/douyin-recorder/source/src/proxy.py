@@ -5,13 +5,6 @@ from dataclasses import dataclass, field
 from .utils import logger
 
 
-class ProxyType(Enum):
-    HTTP = auto()
-    HTTPS = auto()
-    SOCKS = auto()
-
-
-@dataclass(frozen=True)
 class ProxyInfo:
     ip: str = field(default="", repr=True)
     port: str = field(default="", repr=True)

@@ -87,53 +87,6 @@ def signal_handler(_signal, _frame):
 signal.signal(signal.SIGTERM, signal_handler)
 
 
-def display_info() -> None:
-    global start_display_time
-    time.sleep(5)
-    while True:
-        try:
-            sys.stdout.flush()
-            time.sleep(5)
-            if Path(sys.executable).name != 'pythonw.exe':
-                os.system(clear_command)
-            print(f"\r共监测{monitoring}个直播中", end=" | ")
-            print(f"同一时间访问网络的线程数: {max_request}", end=" | ")
-            print(f"是否开启代理录制: {'是' if use_proxy else '否'}", end=" | ")
-            if split_video_by_time:
-                print(f"录制分段开启: {split_time}秒", end=" | ")
-            else:
-                print("录制分段开启: 否", end=" | ")
-            if create_time_file:
-                print("是否生成时间文件: 是", end=" | ")
-            print(f"录制视频质量为: {video_record_quality}", end=" | ")
-            print(f"录制视频格式为: {video_save_type}", end=" | ")
-            print(f"目前瞬时错误数为: {error_count}", end=" | ")
-            now = time.strftime("%H:%M:%S", time.localtime())
-            print(f"当前时间: {now}")
-
-            if len(recording) == 0:
-                time.sleep(5)
-                if monitoring == 0:
-                    print("\r没有正在监测和录制的直播")
-                else:
-                    print(f"\r没有正在录制的直播 循环监测间隔时间：{delay_default}秒")
-            else:
-                now_time = datetime.datetime.now()
-                print("x" * 60)
-                no_repeat_recording = list(set(recording))
-                print(f"正在录制{len(no_repeat_recording)}个直播: ")
-                for recording_live in no_repeat_recording:
-                    rt, qa = recording_time_list[recording_live]
-                    have_record_time = now_time - rt
-                    print(f"{recording_live}[{qa}] 正在录制中 {str(have_record_time).split('.')[0]}")
-
-                # print('\n本软件已运行：'+str(now_time - start_display_time).split('.')[0])
-                print("x" * 60)
-                start_display_time = now_time
-        except Exception as e:
-            logger.error(f"错误信息: {e} 发生错误的行数: {e.__traceback__.tb_lineno}")
-
-
 def update_file(file_path: str, old_str: str, new_str: str, start_str: str = None) -> str | None:
     if old_str == new_str and start_str is None:
         return old_str
@@ -249,108 +202,6 @@ def converts_mp4(converts_file_path: str, is_original_delete: bool = True) -> No
         logger.error(f'Error occurred during conversion: {e}')
     except Exception as e:
         logger.error(f'An unknown error occurred: {e}')
-
-
-def converts_m4a(converts_file_path: str, is_original_delete: bool = True) -> None:
-    try:
-        if os.path.exists(converts_file_path) and os.path.getsize(converts_file_path) > 0:
-            _output = subprocess.check_output([
-                "ffmpeg", "-i", converts_file_path,
-                "-n", "-vn",
-                "-c:a", "aac", "-bsf:a", "aac_adtstoasc", "-ab", "320k",
-                converts_file_path.rsplit('.', maxsplit=1)[0] + ".m4a",
-            ], stderr=subprocess.STDOUT, startupinfo=get_startup_info(os_type))
-            if is_original_delete:
-                time.sleep(1)
-                if os.path.exists(converts_file_path):
-                    os.remove(converts_file_path)
-    except subprocess.CalledProcessError as e:
-        logger.error(f'Error occurred during conversion: {e}')
-    except Exception as e:
-        logger.error(f'An unknown error occurred: {e}')
-
-
-def generate_subtitles(record_name: str, ass_filename: str, sub_format: str = 'srt') -> None:
-    index_time = 0
-    today = datetime.datetime.now()
-    re_datatime = today.strftime('%Y-%m-%d %H:%M:%S')
-
-    def transform_int_to_time(seconds: int) -> str:
-        m, s = divmod(seconds, 60)
-        h, m = divmod(m, 60)
-        return f"{h:02d}:{m:02d}:{s:02d}"
-
-    while True:
-        index_time += 1
-        txt = str(index_time) + "\n" + transform_int_to_time(index_time) + ',000 --> ' + transform_int_to_time(
-            index_time + 1) + ',000' + "\n" + str(re_datatime) + "\n\n"
-
-        with open(f"{ass_filename}.{sub_format.lower()}", 'a', encoding=text_encoding) as f:
-            f.write(txt)
-
-        if record_name not in recording:
-            return
-        time.sleep(1)
-        today = datetime.datetime.now()
-        re_datatime = today.strftime('%Y-%m-%d %H:%M:%S')
-
-
-def adjust_max_request() -> None:
-    global max_request, error_count, pre_max_request, error_window
-    preset = max_request
-
-    while True:
-        time.sleep(5)
-        with max_request_lock:
-            if error_window:
-                error_rate = sum(error_window) / len(error_window)
-            else:
-                error_rate = 0
-
-            if error_rate > error_threshold:
-                max_request = max(1, max_request - 1)
-            elif error_rate < error_threshold / 2 and max_request < preset:
-                max_request += 1
-            else:
-                pass
-
-            if pre_max_request != max_request:
-                pre_max_request = max_request
-                print(f"\r同一时间访问网络的线程数动态改为 {max_request}")
-
-        error_window.append(error_count)
-        if len(error_window) > error_window_size:
-            error_window.pop(0)
-        error_count = 0
-
-
-def push_message(record_name: str, live_url: str, content: str) -> None:
-    msg_title = push_message_title.strip() or "直播间状态更新通知"
-    push_functions = {
-        '微信': lambda: xizhi(xizhi_api_url, msg_title, content),
-        '钉钉': lambda: dingtalk(dingtalk_api_url, content, dingtalk_phone_num, dingtalk_is_atall),
-        '邮箱': lambda: send_email(
-            email_host, login_email, email_password, sender_email, sender_name,
-            to_email, msg_title, content, smtp_port, open_smtp_ssl
-        ),
-        'TG': lambda: tg_bot(tg_chat_id, tg_token, content),
-        'BARK': lambda: bark(
-            bark_msg_api, title=msg_title, content=content, level=bark_msg_level, sound=bark_msg_ring
-        ),
-        'NTFY': lambda: ntfy(
-            ntfy_api, title=msg_title, content=content, tags=ntfy_tags, action_url=live_url, email=ntfy_email
-        ),
-        'PUSHPLUS': lambda: pushplus(pushplus_token, msg_title, content),
-    }
-
-    for platform, func in push_functions.items():
-        if platform in live_status_push.upper():
-            try:
-                result = func()
-                print(f'提示信息：已经将[{record_name}]直播状态消息推送至你的{platform},'
-                      f' 成功{len(result["success"])}, 失败{len(result["error"])}')
-            except Exception as e:
-                color_obj.print_colored(f"直播消息推送到{platform}失败: {e}", color_obj.RED)
 
 
 def run_script(command: str) -> None:
@@ -1684,28 +1535,6 @@ def backup_file(file_path: str, backup_dir_path: str, limit_counts: int = 6) -> 
 
     except Exception as e:
         logger.error(f'\r备份配置文件 {file_path} 失败：{str(e)}')
-
-
-def backup_file_start() -> None:
-    config_md5 = ''
-    url_config_md5 = ''
-
-    while True:
-        try:
-            if os.path.exists(config_file):
-                new_config_md5 = utils.check_md5(config_file)
-                if new_config_md5 != config_md5:
-                    backup_file(config_file, backup_dir)
-                    config_md5 = new_config_md5
-
-            if os.path.exists(url_config_file):
-                new_url_config_md5 = utils.check_md5(url_config_file)
-                if new_url_config_md5 != url_config_md5:
-                    backup_file(url_config_file, backup_dir)
-                    url_config_md5 = new_url_config_md5
-            time.sleep(600)
-        except Exception as e:
-            logger.error(f"备份配置文件失败, 错误信息: {e}")
 
 
 def check_ffmpeg_existence() -> bool:

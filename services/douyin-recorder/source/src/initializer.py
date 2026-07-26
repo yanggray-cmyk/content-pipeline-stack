@@ -176,34 +176,6 @@ def install_nodejs() -> bool:
         return False
 
 
-def ensure_nodejs_installed(func):
-    def wrapper(*args, **kwargs):
-        try:
-            result = subprocess.run(['node', '-v'], capture_output=True)
-            version = result.stdout.strip()
-            if result.returncode == 0 and version:
-                return func(*args, **kwargs)
-        except FileNotFoundError:
-            pass
-        return False
-
-    def wrapped_func(*args, **kwargs):
-        if sys.version_info >= (3, 7):
-            res = wrapper(*args, **kwargs)
-        else:
-            res = wrapper(*args, **kwargs)
-        if not res:
-            install_nodejs()
-            res = wrapper(*args, **kwargs)
-
-        if not res:
-            raise RuntimeError("Node.js is not installed.")
-
-        return func(*args, **kwargs)
-
-    return wrapped_func
-
-
 def check_nodejs_installed() -> bool:
     try:
         result = subprocess.run(['node', '-v'], capture_output=True)
