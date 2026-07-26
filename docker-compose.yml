@@ -113,6 +113,8 @@ services:
     restart: unless-stopped
     environment:
       V6_WORKDIR: ${DATA_DIR}
+      V6_ACCOUNTS_FILE: ${DATA_DIR}/config/accounts.json
+      BRAND_VIDEO_ROOT: ${OPENCLAW_DIR}/workspace/skills/brand-video-tools
       MCP_URL: http://content-pipeline-mcp:18092/mcp
       DOUYIN_COOKIE_PATH: ${DATA_DIR}/config/cookies
       TZ: ${TZ:-Asia/Shanghai}
