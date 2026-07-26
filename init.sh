@@ -42,7 +42,7 @@ ask() {
     local default="$2"
     local var="$3"
     local reply
-    read -r -p "$(printf "\033[1;36m%s\033[0m [$s]: " "$prompt" "$default")" reply
+    read -r -p "$(printf "\033[1;36m%s\033[0m [%s]: " "$prompt" "$default")" reply
     if [ -z "$reply" ]; then
         eval "$var=\"\$default\""
     else
