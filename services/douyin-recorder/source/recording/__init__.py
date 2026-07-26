@@ -4,13 +4,14 @@
 
 from .context import build_context, resolve_proxy
 from .ffmpeg import build_ffmpeg_command
-from .recorder import record_by_format
 from .push import handle_live_status_push
+from .recorder import record_by_format, RecordContext
 
 __all__ = [
     'build_context',
     'resolve_proxy',
     'build_ffmpeg_command',
     'record_by_format',
+    'RecordContext',
     'handle_live_status_push',
 ]
