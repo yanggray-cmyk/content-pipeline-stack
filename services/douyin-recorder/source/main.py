@@ -28,7 +28,7 @@ from typing import Any
 import configparser
 import httpx
 from src import spider, stream
-from recording import build_context, resolve_proxy, build_ffmpeg_command, record_by_format, handle_live_status_push
+from recording import build_context, resolve_proxy, build_ffmpeg_command, record_by_format, RecordContext, handle_live_status_push
 from src.proxy import ProxyDetector
 from src.utils import logger
 from src import utils
@@ -829,20 +829,19 @@ def start_record(url_data: tuple, count_variable: int = -1) -> None:
                                         logger.info(
                                             f"{platform} | {anchor_name} | 直播源地址: {real_url}")
 
-                                # 录制格式调整
-                                record_save_type = video_save_type
-
+                                # h265 codec 不支持 FLV，回退到 TS
                                 if is_flv_preferred_platform(record_url) and port_info.get('flv_url'):
                                     codec = utils.get_query_params(port_info['flv_url'], "codec")
                                     if codec and codec[0] == 'h265':
                                         logger.warning("FLV is not supported for h265 codec, use TS format instead")
-                                        record_save_type = "TS"
+                                        video_save_type_mod = "TS"
+                                    else:
+                                        video_save_type_mod = video_save_type
+                                else:
+                                    video_save_type_mod = video_save_type
 
-                                # 错误计数引用（用 list 包装实现可变引用传递）
-                                _error_count_ref = [error_count]
-
-                                # 按格式执行录制
-                                record_by_format(
+                                # 构建录制上下文 & 执行
+                                ctx = RecordContext(
                                     port_info=port_info,
                                     anchor_name=anchor_name,
                                     title_in_name=title_in_name,
@@ -852,31 +851,30 @@ def start_record(url_data: tuple, count_variable: int = -1) -> None:
                                     record_quality_zh=record_quality_zh,
                                     full_path=full_path,
                                     ffmpeg_command=ffmpeg_command.copy(),
-                                    video_save_type=record_save_type,
+                                    video_save_type=video_save_type_mod,
                                     split_video_by_time=split_video_by_time,
                                     split_time=split_time,
                                     converts_to_mp4=converts_to_mp4,
                                     delete_origin_file=delete_origin_file,
                                     create_time_file=create_time_file,
                                     custom_script=custom_script,
+                                    show_url=show_url,
                                     recording=recording,
                                     recording_time_list=recording_time_list,
+                                    create_var=create_var,
+                                    max_request_lock=max_request_lock,
+                                    error_count_ref=[error_count],
+                                    error_window=error_window,
                                     check_subprocess_func=check_subprocess,
                                     direct_download_stream_func=direct_download_stream,
                                     segment_video_func=segment_video,
                                     converts_mp4_func=converts_mp4,
                                     generate_subtitles_func=generate_subtitles,
-                                    create_var=create_var,
-                                    max_request_lock=max_request_lock,
-                                    error_count_ref=_error_count_ref,
-                                    error_window=error_window,
                                     color_obj=color_obj,
                                     logger=logger,
-                                    show_url=show_url,
                                 )
-
-                                # 回写错误计数
-                                error_count = _error_count_ref[0]
+                                record_by_format(ctx)
+                                error_count = ctx.error_count_ref[0]
 
                                 count_time = time.time()
 
