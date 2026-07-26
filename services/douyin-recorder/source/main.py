@@ -469,27 +469,26 @@ def direct_download_stream(source_url: str, save_path: str, record_name: str, li
         return False
 
 
-def check_subprocess(record_name: str, record_url: str, ffmpeg_command: list, save_type: str,
-                     script_command: str | None = None) -> bool:
-    save_file_path = ffmpeg_command[-1]
-    process = subprocess.Popen(
-        ffmpeg_command, stdin=subprocess.PIPE, stderr=subprocess.STDOUT, startupinfo=get_startup_info(os_type)
-    )
-
-    subs_file_path = save_file_path.rsplit('.', maxsplit=1)[0]
-    subs_thread_name = f'subs_{Path(subs_file_path).name}'
+def _start_subtitle_thread(save_file_path: str, record_name: str) -> None:
+    """创建字幕生成线程"""
     if create_time_file and not split_video_by_time and '音频' not in save_type:
+        subs_file_path = save_file_path.rsplit('.', maxsplit=1)[0]
+        subs_thread_name = f'subs_{Path(subs_file_path).name}'
         create_var[subs_thread_name] = threading.Thread(
             target=generate_subtitles, args=(record_name, subs_file_path)
         )
         create_var[subs_thread_name].daemon = True
         create_var[subs_thread_name].start()
 
+
+def _wait_subprocess_live(process, record_name: str, record_url: str) -> bool:
+    """轮询子进程，检测注释/退出信号。返回 True 表示被中断。"""
     while process.poll() is None:
         if record_url in url_comments or exit_recording:
-            color_obj.print_colored(f"[{record_name}]录制时已被注释,本条线程将会退出", color_obj.YELLOW)
+            color_obj.print_colored(
+                f"[{record_name}]录制时已被注释,本条线程将会退出", color_obj.YELLOW
+            )
             clear_record_info(record_name, record_url)
-            # process.terminate()
             if os.name == 'nt':
                 if process.stdin:
                     process.stdin.write(b'q')
@@ -499,56 +498,85 @@ def check_subprocess(record_name: str, record_url: str, ffmpeg_command: list, sa
             process.wait()
             return True
         time.sleep(1)
+    return False
+
+
+def _run_custom_script(script_command: str, record_name: str, save_file_path: str,
+                       save_type: str) -> None:
+    """构建参数并执行自定义脚本"""
+    if "python" in script_command:
+        params = [
+            f'--record_name "{record_name}"',
+            f'--save_file_path "{save_file_path}"',
+            f'--save_type {save_type}',
+            f'--split_video_by_time {split_video_by_time}',
+            f'--converts_to_mp4 {converts_to_mp4}',
+        ]
+    else:
+        params = [
+            f'"{record_name.split(" ", maxsplit=1)[-1]}"',
+            f'"{save_file_path}"',
+            save_type,
+            f'split_video_by_time:{split_video_by_time}',
+            f'converts_to_mp4:{converts_to_mp4}'
+        ]
+    script_command = script_command.strip() + ' ' + ' '.join(params)
+    run_script(script_command)
+
+
+def _handle_subprocess_success(save_file_path: str, save_type: str) -> None:
+    """处理子进程成功返回（TS→MP4 转换）"""
+    if not (converts_to_mp4 and save_type == 'TS'):
+        return
+    if split_video_by_time:
+        file_paths = utils.get_file_paths(os.path.dirname(save_file_path))
+        prefix = os.path.basename(save_file_path).rsplit('_', maxsplit=1)[0]
+        for path in file_paths:
+            if prefix in path:
+                logger.info(
+                    f"[fix-2026-07-04] 同步转换: {path} (delete_origin={delete_origin_file})"
+                )
+                try:
+                    converts_mp4(path, delete_origin_file)
+                except Exception as e:
+                    logger.error(f"转换失败: {path} - {e}")
+    else:
+        logger.info(
+            f"[fix-2026-07-04] 同步转换: {save_file_path} (delete_origin={delete_origin_file})"
+        )
+        try:
+            converts_mp4(save_file_path, delete_origin_file)
+        except Exception as e:
+            logger.error(f"转换失败: {save_file_path} - {e}")
+
+
+def check_subprocess(record_name: str, record_url: str, ffmpeg_command: list, save_type: str,
+                     script_command: str | None = None) -> bool:
+    save_file_path = ffmpeg_command[-1]
+    process = subprocess.Popen(
+        ffmpeg_command, stdin=subprocess.PIPE, stderr=subprocess.STDOUT,
+        startupinfo=get_startup_info(os_type)
+    )
+
+    _start_subtitle_thread(save_file_path, record_name)
+
+    if _wait_subprocess_live(process, record_name, record_url):
+        return True
 
     return_code = process.returncode
-    stop_time = time.strftime('%Y-%m-%d %H:%M:%S')
     if return_code == 0:
-        if converts_to_mp4 and save_type == 'TS':
-            if split_video_by_time:
-                file_paths = utils.get_file_paths(os.path.dirname(save_file_path))
-                prefix = os.path.basename(save_file_path).rsplit('_', maxsplit=1)[0]
-                for path in file_paths:
-                    if prefix in path:
-                        # 直播真正结束（comment_end=True），同步执行 ts→mp4 转换
-                        # 否则 daemon 线程会在主进程退出时被 kill，.ts 残留
-                        logger.info(f"[fix-2026-07-04] 同步转换: {path} (delete_origin={delete_origin_file})")
-                        try:
-                            converts_mp4(path, delete_origin_file)
-                        except Exception as e:
-                            logger.error(f"转换失败: {path} - {e}")
-            else:
-                # 单段直播结束，同步转换确保 .ts 被删除
-                logger.info(f"[fix-2026-07-04] 同步转换: {save_file_path} (delete_origin={delete_origin_file})")
-                try:
-                    converts_mp4(save_file_path, delete_origin_file)
-                except Exception as e:
-                    logger.error(f"转换失败: {save_file_path} - {e}")
+        _handle_subprocess_success(save_file_path, save_type)
+        stop_time = time.strftime('%Y-%m-%d %H:%M:%S')
         print(f"\n{record_name} {stop_time} 直播录制完成\n")
-
         if script_command:
             logger.debug("开始执行脚本命令!")
-            if "python" in script_command:
-                params = [
-                    f'--record_name "{record_name}"',
-                    f'--save_file_path "{save_file_path}"',
-                    f'--save_type {save_type}',
-                    f'--split_video_by_time {split_video_by_time}',
-                    f'--converts_to_mp4 {converts_to_mp4}',
-                ]
-            else:
-                params = [
-                    f'"{record_name.split(" ", maxsplit=1)[-1]}"',
-                    f'"{save_file_path}"',
-                    save_type,
-                    f'split_video_by_time:{split_video_by_time}',
-                    f'converts_to_mp4:{converts_to_mp4}'
-                ]
-            script_command = script_command.strip() + ' ' + ' '.join(params)
-            run_script(script_command)
+            _run_custom_script(script_command, record_name, save_file_path, save_type)
             logger.debug("脚本命令执行结束!")
-
     else:
-        color_obj.print_colored(f"\n{record_name} {stop_time} 直播录制出错,返回码: {return_code}\n", color_obj.RED)
+        color_obj.print_colored(
+            f"\n{record_name} {time.strftime('%Y-%m-%d %H:%M:%S')} 直播录制出错,返回码: {return_code}\n",
+            color_obj.RED
+        )
 
     recording.discard(record_name)
     return False
