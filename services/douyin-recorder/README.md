@@ -2,6 +2,42 @@
 
 Douyin live stream recorder via ffmpeg. 复用上游 Dockerfile (`/home/main/DouyinLiveRecorder/Dockerfile`) + 容器内 mount local config.ini。
 
+## 架构 (v2.0 - 策略模式)
+
+**2026-07-26 重构**: 51 elif 分支 → 策略模式 (PlatformStrategy + PlatformRegistry)
+
+### 模块结构
+
+```
+src/
+├── platforms/
+│   ├── base.py          # PlatformStrategy 基类 + PlatformRegistry
+│   ├── domestic.py      # 35 个国内平台 (声明式注册)
+│   ├── overseas.py      # 7 个海外平台 (声明式注册)
+│   ├── special.py       # 9 个特殊平台 (抖音/虎牙/SOOP 等)
+│   └── __init__.py      # registry 初始化
+├── spider.py            # 平台 API 调用
+├── stream.py            # 流处理
+└── utils.py             # 工具函数
+```
+
+### 平台支持 (51 个)
+
+| 类别 | 数量 | 示例 |
+|---|---|---|
+| **国内** | 35 | 快手、B站、小红书、淘宝、斗鱼... |
+| **海外** | 7 | TikTok、YouTube、Twitch... |
+| **特殊** | 9 | 抖音、虎牙、SOOP、FlexTV... |
+
+### 调用流程
+
+```python
+# main.py line 642
+strategy = registry.match(record_url)
+if strategy:
+    stream_url = await strategy.get_stream_url(record_url)
+```
+
 ## systemd → docker 行为对照
 
 | | systemd | docker |
@@ -37,33 +73,4 @@ docker compose up -d douyin-recorder
 
 # 2. 看录制
 docker logs -f douyin-recorder
-
-# 3. 验证 output
-ls -la /home/main/DouyinLiveRecorder/downloads/抖音直播/
-
-# 4. BFF dashboard (如果 expose 18988)
-open http://127.0.0.1:18988/
 ```
-
-## 关键 volume
-
-```yaml
-volumes:
-  - /home/main/DouyinLiveRecorder/downloads:/app/downloads  # rw, 视频落盘
-  - /home/main/douyin-data/config/douyin-recorder:/app/config:ro  # URL_config.ini + config.ini
-  - /home/main/douyin-data/scripts/hooks:/hooks:ro  # transcribe-hook-wrapper.sh
-```
-
-## 备注
-
-- **上游 Dockerfile 是 OpenClaw 自定义**(hmily-mod),不是原始 ihmily/DouyinLiveRecorder
-- Python 3.11 + node 20 + ffmpeg + Chromium,~600MB 镜像层
-- **Chromium 在容器内** — 性能与 systemd 几乎等(同 host mount)
-- **transcribe hook 是 shell 调 MCP URL**,依赖 `MCP_URL=http://content-pipeline-mcp:18092/mcp`(环境变量)
-- 当前 docker 模式**未单测**(build 验证待执行)
-
-## 已知问题
-
-- 上游 `main.py.bak.2026-07-04_12-15` 等备份文件被 COPY 进 image(多余,但不致命)
-- `.env` 中的 `DOUYIN_RECORDER_DASHBOARD_TOKEN` 是 BFF dashboard 密码, 上游 config.ini 也要同步
-- `main.py` 直接调 `pathlib.Path(__file__).parent`,容器里要确保 `/app/config` 真的有 URL_config.ini
