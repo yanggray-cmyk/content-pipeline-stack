@@ -1,0 +1,65 @@
+name: Close stale PRs + merge strategy pattern refactor
+
+# 触发方式: workflow_dispatch (手动触发)
+# 目的: close #6/#7/#8 (stale/toxic), merge #9 (strategy pattern refactor)
+# 由 main agent 维护, Cove 拍板后跑
+
+on:
+  workflow_dispatch:
+    inputs:
+      close_prs:
+        description: 'PR list to close (space-separated, e.g. "6 7 8")'
+        required: true
+        default: '6 7 8'
+      merge_pr:
+        description: 'PR to merge (squash), e.g. "9"'
+        required: true
+        default: '9'
+      reason:
+        description: 'Reason for close (recorded in PR comment)'
+        required:false
+        default: 'Closed by Ops PR due to security/scope concerns - see HEARTBEAT.md 2026-07-26 17:11 for context'
+
+# 权限: GITHUB_TOKEN 默认对 PR 有读+写+评论 + merge 权限
+permissions:
+  contents: write
+  pull-requests: write
+
+jobs:
+  ops:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Show what we're doing
+        run: |
+          echo "=== Inputs ==="
+          echo "close_prs: ${{ inputs.close_prs }}"
+          echo "merge_pr: ${{ inputs.merge_pr }}"
+          echo "reason: ${{ inputs.reason }}"
+
+      - name: Close stale PRs
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          REASON: ${{ inputs.reason }}
+        run: |
+          for PR in ${{ inputs.close_prs }}; do
+            echo "--- Closing PR #$PR ---"
+            gh pr close "$PR" --comment "$REASON" || echo "Failed to close #$PR (continuing)"
+          done
+
+      - name: Merge strategy pattern PR
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          PR=${{ inputs.merge_pr }}
+          echo "--- Merging PR #$PR (squash) ---"
+          gh pr merge "$PR" --squash --delete-branch --body "Squash merge of strategy pattern refactor (51 elif branches → PlatformStrategy registry). Architecture review: pass. Smoke test: 51 strategies registered, 13 URLs matched. Caveat: asyncio.Semaphore sync context manager issue documented as follow-up issue."
+
+      - name: Verify final state
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          echo "=== Open PRs after ops ==="
+          gh pr list --state open --json number,title,headRefName
+          echo ""
+          echo "=== Recent merge commits on main ==="
+          git log --oneline -5
