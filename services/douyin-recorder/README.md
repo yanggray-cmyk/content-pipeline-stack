@@ -2,41 +2,53 @@
 
 Douyin live stream recorder via ffmpeg. 复用上游 Dockerfile (`/home/main/DouyinLiveRecorder/Dockerfile`) + 容器内 mount local config.ini。
 
-## 架构 (v2.0 - 策略模式)
+## 架构 (v3.0 - 全模块化)
 
-**2026-07-26 重构**: 51 elif 分支 → 策略模式 (PlatformStrategy + PlatformRegistry)
+**2026-07-26 重构系列** (PR #11-17):
+- PR #11: 51 elif 分支 → 策略模式 (PlatformStrategy + PlatformRegistry)
+- PR #12: spider.py (3394 行) → platforms/streams/ 按域拆分
+- PR #13/14: start_record (737 行) → recording/ 模块 + RecordContext
+- PR #15: special.py (1250 行) → special/ 按平台拆分
+- PR #16/17: stream.py + 全部函数 <50 行
 
 ### 模块结构
 
 ```
-src/
-├── platforms/
-│   ├── base.py          # PlatformStrategy 基类 + PlatformRegistry
-│   ├── domestic.py      # 35 个国内平台 (声明式注册)
-│   ├── overseas.py      # 7 个海外平台 (声明式注册)
-│   ├── special.py       # 9 个特殊平台 (抖音/虎牙/SOOP 等)
-│   └── __init__.py      # registry 初始化
-├── spider.py            # 平台 API 调用
-├── stream.py            # 流处理
-└── utils.py             # 工具函数
+source/
+├── main.py                    # 入口 + start_record 编排 (313 行)
+├── recording/                 # 录制执行层 (PR #13/14)
+│   ├── context.py             # build_context / resolve_proxy
+│   ├── ffmpeg.py              # build_ffmpeg_command
+│   ├── push.py                # handle_live_status_push
+│   └── recorder/              # 按格式分发 (RecordContext)
+│       ├── base.py            # RecordContext dataclass + record_by_format
+│       ├── audio.py           # MP3/M4A
+│       ├── flv.py             # FLV + 直下载
+│       └── standard.py        # MKV/MP4/TS
+├── src/
+│   ├── platforms/             # 策略模式 (PR #11)
+│   │   ├── base.py            # PlatformStrategy 基类 + Registry
+│   │   ├── domestic.py        # 35 国内平台
+│   │   ├── overseas.py        # 7 海外平台
+│   │   └── special.py         # 9 特殊平台
+│   ├── platforms/streams/     # 平台 API 调用 (PR #12/15)
+│   │   ├── domestic.py        # 国内流获取 (39 函数)
+│   │   ├── overseas.py        # 海外流获取 (13 函数)
+│   │   └── special/           # 特殊平台 (PR #15)
+│   │       ├── douyin.py      # 抖音 Web/App
+│   │       ├── huya.py / soop.py / flextv.py
+│   │       ├── popkon.py / twitcasting.py
+│   │       └── taobao_jd.py
+│   ├── spider.py              # re-export 兼容层 (19 行)
+│   └── stream.py              # 流地址选择层 + 质量 helpers
+└── config/
 ```
 
-### 平台支持 (51 个)
+### 设计原则 (铁律)
 
-| 类别 | 数量 | 示例 |
-|---|---|---|
-| **国内** | 35 | 快手、B站、小红书、淘宝、斗鱼... |
-| **海外** | 7 | TikTok、YouTube、Twitch... |
-| **特殊** | 9 | 抖音、虎牙、SOOP、FlexTV... |
-
-### 调用流程
-
-```python
-# main.py line 642
-strategy = registry.match(record_url)
-if strategy:
-    stream_url = await strategy.get_stream_url(record_url)
-```
+- 每个函数 < 50 行
+- 参数 > 5 个 → dataclass/context 对象
+- 重复模式 > 2 次 → 提取公共 helper (如 `_pad_to_five`)
 
 ## systemd → docker 行为对照
 
