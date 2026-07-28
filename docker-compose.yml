@@ -163,35 +163,6 @@ services:
     networks:
       - content-pipeline-net
 
-  # ─── v6-download (下载抖音 mp4, chromium fallback) ─────────────────────────
-  v6-download:
-    build:
-      context: ./services/v6-download
-      dockerfile: Dockerfile
-    image: ${REGISTRY_URL:-localhost:5000}/content-pipeline-stack/v6-download:${IMAGE_TAG:-0.1.0}
-    container_name: v6-download
-    restart: unless-stopped
-    profiles: ["v6-workers"]
-    # 铁律 179.2 (2026-07-26 12:18 Cove 拍板根治): runtime 切 uid 1001 (host main user)
-    # 否则 state.json 写完所有权变 root, systemd worker (uid 1001) 后续 Permission denied
-    #  注: build 仍以 root 跑 (apt install 需要), 切换是 runtime-only
-    user: "1001:1001"
-    environment:
-      V6_WORKDIR: ${DATA_DIR}
-      PLAYWRIGHT_BROWSERS_PATH: /ms-playwright
-      TZ: ${TZ:-Asia/Shanghai}
-    volumes:
-      - ${DATA_DIR}:${DATA_DIR}
-      - ${PLAYWRIGHT_DIR}:/ms-playwright
-      - ${OPENCLAW_DIR}/workspace/skills/brand-video-tools:${OPENCLAW_DIR}/workspace/skills/brand-video-tools
-      - ${OPENCLAW_DIR}/workspace/skills/douyin-batch:${OPENCLAW_DIR}/workspace/skills/douyin-batch
-    deploy:
-      resources:
-        limits:
-          memory: 1536M
-          cpus: "1.0"
-    networks:
-      - content-pipeline-net
 
   # ─── v6-transcribe (HK ASR 转录, 调 host.docker.internal:18200) ─────────────
   v6-transcribe:
