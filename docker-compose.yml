@@ -215,6 +215,10 @@ services:
       V6_WORKDIR: ${DATA_DIR}
       KB_DATA_DIR: ${DATA_DIR}/knowledge-base
       TZ: ${TZ:-Asia/Shanghai}
+      # 铁律 107/146 (2026-07-28 13:01 Cove 拍板): ALLOWED_AUTHORS 含 human name + alias 兜底
+      # 7-26 22:54 加的飞哥看过没有假货(jade_e) / 玉之源(yuzhiyuan) 之前 docker-compose 漏配
+      # worker 默认 ALLOWED_AUTHORS (10 老账号) 让 70 个 ghost items 全部 skip in 0.0s
+      DISTILL_ALLOWED_AUTHORS: 大雅,玉留君,宏硕说玉,唐sir,淡然,danran_jade_c,daya,jade_a,jade_b,tang_sir,飞哥看过没有假货,jade_e,玉之源,yuzhiyuan
     volumes:
       - ${DATA_DIR}:${DATA_DIR}
       - ${OPENCLAW_DIR}/workspace/skills/knowledge-distill:${OPENCLAW_DIR}/workspace/skills/knowledge-distill
