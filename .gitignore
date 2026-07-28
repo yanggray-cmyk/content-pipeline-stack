@@ -68,7 +68,6 @@ downloads/
 **/*.mp4
 **/*.mp3
 **/*.flv
-**/*.ts
 
 # git subprojects (those have own .git)
 Obsidian/
