@@ -112,12 +112,17 @@ services:
       - content-pipeline-mcp
 
   # ─── v6-monitor (抖音账号监控 daemon, 6h 间隔) ─────────────────────────────
+  # 铁律 200.4 (2026-07-28 19:46 Cove 拍板): systemd v6-monitor.service 是真源 (host 进程),
+  #   docker 200M memory limit 反复 OOM kill (137), 与 systemd 6h daemon 冲突.
+  #   改 profiles: ["v6-workers"] 防止 docker compose 默认 up, systemd 跑独占.
+  #   要启 docker v6-monitor (debug / 临时调试) 用: docker compose --profile v6-workers up v6-monitor
   v6-monitor:
     build:
       context: ./services/v6-monitor
       dockerfile: Dockerfile
     image: ${REGISTRY_URL:-localhost:5000}/content-pipeline-stack/v6-monitor:${IMAGE_TAG:-0.1.0}
     container_name: v6-monitor
+    profiles: ["v6-workers"]
     restart: unless-stopped
     environment:
       V6_WORKDIR: ${DATA_DIR}
