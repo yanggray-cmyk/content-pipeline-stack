@@ -18,8 +18,16 @@ services:
     environment:
       NODE_ENV: production
       HOST: "0.0.0.0"
+      # 铁律 192 (Phase 4-ii / 2026-07-28 14:47 Cove 拍 C 方案):
+      # text-distill-service URL + token (供 MCP Tool 8 调 host 上的 HTTP service)
+      TEXT_DISTILL_URL: "http://host.docker.internal:18091/distill"
+      TEXT_DISTILL_TOKEN: ${TEXT_DISTILL_TOKEN:-}
     env_file:
       - ./.env
+    # 铁律 192 (Phase 4-ii): 让容器能解析 host.docker.internal 到 host IP
+    # (Linux Docker 27+ 需显式声明 extra_hosts, host-gateway 是 Docker 内置 magic)
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
     volumes:
       # Read-only access to pipeline data dir (queue.db, transcripts, cookies)
       - ${DATA_DIR}:${DATA_DIR}:ro
