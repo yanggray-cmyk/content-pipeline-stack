@@ -224,6 +224,8 @@ services:
       KB_DATA_DIR: ${DATA_DIR}/knowledge-base
       TZ: ${TZ:-Asia/Shanghai}
       # 铁律 107/146 (2026-07-28 13:01 Cove 拍板): ALLOWED_AUTHORS 含 human name + alias 兜底
+      # B 方案 2026-07-28 16:00: 这是 FALLBACK env, single source 是 accounts.json
+      # worker 启动时优先读 accounts.json enabled=True, 加载失败才用 env
       # 7-26 22:54 加的飞哥看过没有假货(jade_e) / 玉之源(yuzhiyuan) 之前 docker-compose 漏配
       # worker 默认 ALLOWED_AUTHORS (10 老账号) 让 70 个 ghost items 全部 skip in 0.0s
       DISTILL_ALLOWED_AUTHORS: 大雅,玉留君,宏硕说玉,唐sir,淡然,danran_jade_c,daya,jade_a,jade_b,tang_sir,飞哥看过没有假货,jade_e,玉之源,yuzhiyuan
@@ -234,6 +236,10 @@ services:
       # distill-llm.py load_keys_from_file() 读 /home/main/.openclaw/workspace/ts-lb/api-keys.json
       # bind-mount readonly 防 worker 意外改 keys
       - ${OPENCLAW_DIR}/workspace/ts-lb:${OPENCLAW_DIR}/workspace/ts-lb:ro
+      # B 方案 2026-07-28 16:00 (Cove 15:53 拍 B): accounts.json 是 single source of truth
+      # v6_distill_worker.py 启动时读这个, 加载 enabled=True 的 name + alias 作 ALLOWED_AUTHORS
+      # bind-mount readonly 防 worker 改配置
+      - ${DATA_DIR}/scripts/v6_pipeline/monitor:${DATA_DIR}/scripts/v6_pipeline/monitor:ro
     networks:
       - content-pipeline-net
 
