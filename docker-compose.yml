@@ -218,6 +218,10 @@ services:
     volumes:
       - ${DATA_DIR}:${DATA_DIR}
       - ${OPENCLAW_DIR}/workspace/skills/knowledge-distill:${OPENCLAW_DIR}/workspace/skills/knowledge-distill
+      # 铁律 199 (2026-07-28 12:25 Cove 拍板): ro mount ts-lb/api-keys.json (LLM API key source)
+      # distill-llm.py load_keys_from_file() 读 /home/main/.openclaw/workspace/ts-lb/api-keys.json
+      # bind-mount readonly 防 worker 意外改 keys
+      - ${OPENCLAW_DIR}/workspace/ts-lb:${OPENCLAW_DIR}/workspace/ts-lb:ro
     networks:
       - content-pipeline-net
 
