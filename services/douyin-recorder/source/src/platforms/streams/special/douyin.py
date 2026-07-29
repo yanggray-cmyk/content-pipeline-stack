@@ -33,6 +33,39 @@ OptionalStr = str | None
 OptionalDict = dict | None
 
 
+async def _douyin_web_fetch_room_data(web_rid: str, proxy_addr: OptionalStr,
+                                      headers: dict, url: str) -> dict:
+    """请求抖音 Web 接口（含 a_bogus 签名）"""
+    params = {
+        "aid": "6383",
+        "app_name": "douyin_web",
+        "live_id": "1",
+        "device_platform": "web",
+        "language": "zh-CN",
+        "browser_language": "zh-CN",
+        "browser_platform": "Win32",
+        "browser_name": "Chrome",
+        "browser_version": "116.0.0.0",
+        "web_rid": web_rid,
+        'msToken': '',
+    }
+    api = f'https://live.douyin.com/webcast/room/web/enter/?{urllib.parse.urlencode(params)}'
+    a_bogus = ab_sign(urllib.parse.urlparse(api).query, headers['user-agent'])
+    api += "&a_bogus=" + a_bogus
+    try:
+        json_str = await async_req(url=api, proxy_addr=proxy_addr, headers=headers)
+        if not json_str:
+            raise Exception("it triggered risk control")
+        json_data = json.loads(json_str)['data']
+        if not json_data['data']:
+            raise Exception(f"{url} VR live is not supported")
+        room_data = json_data['data'][0]
+        room_data['anchor_name'] = json_data['user']['nickname']
+        return room_data
+    except Exception as e:
+        raise Exception(f"Douyin web data fetch error, because {e}.")
+
+
 async def get_douyin_web_stream_data(url: str, proxy_addr: OptionalStr = None, cookies: OptionalStr = None):
     headers = {
         'cookie': ''
@@ -46,34 +79,7 @@ async def get_douyin_web_stream_data(url: str, proxy_addr: OptionalStr = None, c
 
     try:
         web_rid = url.split('?')[0].split('live.douyin.com/')[-1]
-        params = {
-            "aid": "6383",
-            "app_name": "douyin_web",
-            "live_id": "1",
-            "device_platform": "web",
-            "language": "zh-CN",
-            "browser_language": "zh-CN",
-            "browser_platform": "Win32",
-            "browser_name": "Chrome",
-            "browser_version": "116.0.0.0",
-            "web_rid": web_rid,
-            'msToken': '',
-        }
-
-        api = f'https://live.douyin.com/webcast/room/web/enter/?{urllib.parse.urlencode(params)}'
-        a_bogus = ab_sign(urllib.parse.urlparse(api).query, headers['user-agent'])
-        api += "&a_bogus=" + a_bogus
-        try:
-            json_str = await async_req(url=api, proxy_addr=proxy_addr, headers=headers)
-            if not json_str:
-                raise Exception("it triggered risk control")
-            json_data = json.loads(json_str)['data']
-            if not json_data['data']:
-                raise Exception(f"{url} VR live is not supported")
-            room_data = json_data['data'][0]
-            room_data['anchor_name'] = json_data['user']['nickname']
-        except Exception as e:
-            raise Exception(f"Douyin web data fetch error, because {e}.")
+        room_data = await _douyin_web_fetch_room_data(web_rid, proxy_addr, headers, url)
 
         if room_data['status'] == 2:
             if 'stream_url' not in room_data:
@@ -81,28 +87,7 @@ async def get_douyin_web_stream_data(url: str, proxy_addr: OptionalStr = None, c
                     "The live streaming type or gameplay is not supported on the computer side yet, please use the "
                     "app to share the link for recording."
                 )
-            live_core_sdk_data = room_data['stream_url']['live_core_sdk_data']
-            pull_datas = room_data['stream_url']['pull_datas']
-            if live_core_sdk_data:
-                if pull_datas:
-                    key = list(pull_datas.keys())[0]
-                    json_str = pull_datas[key]['stream_data']
-                else:
-                    json_str = live_core_sdk_data['pull_data']['stream_data']
-                json_data = json.loads(json_str)
-                if 'origin' in json_data['data']:
-                    stream_data = live_core_sdk_data['pull_data']['stream_data']
-                    origin_data = json.loads(stream_data)['data']['origin']['main']
-                    sdk_params = json.loads(origin_data['sdk_params'])
-                    origin_hls_codec = sdk_params.get('VCodec') or ''
-
-                    origin_url_list = json_data['data']['origin']['main']
-                    origin_m3u8 = {'ORIGIN': origin_url_list["hls"] + '&codec=' + origin_hls_codec}
-                    origin_flv = {'ORIGIN': origin_url_list["flv"] + '&codec=' + origin_hls_codec}
-                    hls_pull_url_map = room_data['stream_url']['hls_pull_url_map']
-                    flv_pull_url = room_data['stream_url']['flv_pull_url']
-                    room_data['stream_url']['hls_pull_url_map'] = {**origin_m3u8, **hls_pull_url_map}
-                    room_data['stream_url']['flv_pull_url'] = {**origin_flv, **flv_pull_url}
+            _douyin_process_origin_stream(room_data)
     except Exception as e:
         print(f"Error message: {e} Error line: {e.__traceback__.tb_lineno}")
         room_data = {'anchor_name': ""}

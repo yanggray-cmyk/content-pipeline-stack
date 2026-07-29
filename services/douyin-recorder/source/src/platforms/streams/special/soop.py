@@ -252,6 +252,43 @@ async def _soop_fetch_data_with_cookie(url: str, cookie: str, result: dict,
     return result
 
 
+async def _soop_fetch_anchor_info(url: str, proxy_addr: OptionalStr, headers: dict) -> tuple:
+    """请求 watch API，返回 (json_data, anchor_name)"""
+    split_url = url.split('/')
+    bj_id = split_url[3] if len(split_url) < 6 else split_url[5]
+    data = {
+        'bj_id': bj_id,
+        'broad_no': '',
+        'agent': 'web',
+        'confirm_adult': 'true',
+        'player_type': 'webm',
+        'mode': 'live',
+    }
+    url2 = 'http://api.m.sooplive.co.kr/broad/a/watch'
+    json_str = await async_req(url=url2, proxy_addr=proxy_addr, headers=headers, data=data, abroad=True)
+    json_data = json.loads(json_str)
+
+    if 'user_nick' in json_data['data']:
+        anchor_name = json_data['data']['user_nick']
+        if "bj_id" in json_data['data']:
+            anchor_name = f"{anchor_name}-{json_data['data']['bj_id']}"
+    else:
+        anchor_name = ''
+    return json_data, anchor_name
+
+
+async def _soop_fetch_live_result(json_data: dict, result: dict,
+                                  proxy_addr: OptionalStr, headers: dict) -> dict:
+    """成功路径：拉取 CDN 地址与播放列表"""
+    broad_no = json_data['data']['broad_no']
+    hls_authentication_key = json_data['data']['hls_authentication_key']
+    view_url_data = await get_sooplive_cdn_url(broad_no, proxy_addr=proxy_addr)
+    m3u8_url = view_url_data['view_url'] + '?aid=' + hls_authentication_key
+    result |= {'is_live': True, 'm3u8_url': m3u8_url,
+               'play_url_list': await _soop_get_url_list(m3u8_url, proxy_addr, headers)}
+    return result
+
+
 async def get_sooplive_stream_data(
         url: str, proxy_addr: OptionalStr = None, cookies: OptionalStr = None,
         username: OptionalStr = None, password: OptionalStr = None
@@ -268,30 +305,7 @@ async def get_sooplive_stream_data(
     if "sooplive.com" in url:
         return await _fetch_web_stream_data_global(url, proxy_addr, cookies)
 
-    split_url = url.split('/')
-    bj_id = split_url[3] if len(split_url) < 6 else split_url[5]
-
-    data = {
-        'bj_id': bj_id,
-        'broad_no': '',
-        'agent': 'web',
-        'confirm_adult': 'true',
-        'player_type': 'webm',
-        'mode': 'live',
-    }
-
-    url2 = 'http://api.m.sooplive.co.kr/broad/a/watch'
-
-    json_str = await async_req(url=url2, proxy_addr=proxy_addr, headers=headers, data=data, abroad=True)
-    json_data = json.loads(json_str)
-
-    if 'user_nick' in json_data['data']:
-        anchor_name = json_data['data']['user_nick']
-        if "bj_id" in json_data['data']:
-            anchor_name = f"{anchor_name}-{json_data['data']['bj_id']}"
-    else:
-        anchor_name = ''
-
+    json_data, anchor_name = await _soop_fetch_anchor_info(url, proxy_addr, headers)
     result = {"anchor_name": anchor_name or '' ,"is_live": False}
 
     if not anchor_name:
@@ -317,13 +331,7 @@ async def get_sooplive_stream_data(
             return result
 
     if json_data['result'] == 1 and anchor_name:
-        broad_no = json_data['data']['broad_no']
-        hls_authentication_key = json_data['data']['hls_authentication_key']
-        view_url_data = await get_sooplive_cdn_url(broad_no, proxy_addr=proxy_addr)
-        view_url = view_url_data['view_url']
-        m3u8_url = view_url + '?aid=' + hls_authentication_key
-        result |= {'is_live': True, 'm3u8_url': m3u8_url,
-                   'play_url_list': await _soop_get_url_list(m3u8_url, proxy_addr, headers)}
+        result = await _soop_fetch_live_result(json_data, result, proxy_addr, headers)
     result['new_cookies'] = None
     return result
 
