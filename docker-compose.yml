@@ -20,7 +20,7 @@ services:
       HOST: "0.0.0.0"
       # 铁律 192 (Phase 4-ii / 2026-07-28 14:47 Cove 拍 C 方案):
       # text-distill-service URL + token (供 MCP Tool 8 调 host 上的 HTTP service)
-      TEXT_DISTILL_URL: "http://host.docker.internal:18091/distill"
+      TEXT_DISTILL_URL: "http://host.docker.internal:18191/distill"
       TEXT_DISTILL_TOKEN: ${TEXT_DISTILL_TOKEN:-}
     env_file:
       - ./.env
@@ -66,12 +66,17 @@ services:
       NODE_ENV: production
       PORT: "18098"
       FS_DATA_ROOT: ${DATA_DIR}/files
+      # 铁律 201 (2026-07-29 13:31 Cove 原则: "系统在系统盘, 下载的数据在数据盘")
+      # AUDIT_DIR 改到数据盘, file-service 运行时审计是 docker 数据
+      AUDIT_DIR: ${DATA_DIR}/docker/file-service/audit
     env_file:
       - ./.env
     volumes:
       - ${DATA_DIR}:${DATA_DIR}
       - ${UPLOADS_DIR}:${UPLOADS_DIR}
-      - ${OPENCLAW_DIR}:${OPENCLAW_DIR}
+      # 铁律 201: openclaw workspace 是"系统", 改精确 mount + ro 防止容器误写
+      # 原来挂整个 OPENCLAW_DIR (14G 系统盘数据), 现在只挂 workspace 子目录 + ro
+      - ${OPENCLAW_DIR}/workspace:${OPENCLAW_DIR}/workspace:ro
     deploy:
       resources:
         limits:
