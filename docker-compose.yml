@@ -207,9 +207,9 @@ services:
       # 铁律 107/146 (2026-07-28 13:01 Cove 拍板): ALLOWED_AUTHORS 含 human name + alias 兜底
       # B 方案 2026-07-28 16:00: 这是 FALLBACK env, single source 是 accounts.json
       # worker 启动时优先读 accounts.json enabled=True, 加载失败才用 env
-      # 7-26 22:54 加的飞哥看过没有假货(jade_e) / 玉之源(yuzhiyuan) 之前 docker-compose 漏配
-      # worker 默认 ALLOWED_AUTHORS (10 老账号) 让 70 个 ghost items 全部 skip in 0.0s
-      DISTILL_ALLOWED_AUTHORS: 大雅,玉留君,宏硕说玉,唐sir,唐Sir,tangsir_livestream,淡然,danran_jade_c,daya,jade_a,jade_b,tang_sir,飞哥看过没有假货,jade_e,玉之源,yuzhiyuan,识藏,懂藏,tibetan_a,tibetan_b
+      # v274 (2026-08-04 21:50): 同步到 accounts.json 真源全集 20 字串 (10 enabled 账户 × author + alias)
+      # 之前 16 字串缺 tangsir_livestream/tibetan_a/tibetan_b/minzu + 4 author 新全名
+      DISTILL_ALLOWED_AUTHORS: danran_jade_c,daya,jade_a,jade_b,jade_e,minzu,tangsir_livestream,tibetan_a,tibetan_b,yuzhiyuan,北京民族商店甄选直播间,唐Sir·主播培训8月8-10日,大雅,宏硕说玉｜NGTC宝石学家,懂藏,淡然苏工河磨玉1号,玉之源,玉留君 大得鉴宝,识藏,飞哥看过没有假货
     volumes:
       - ${DATA_DIR}:${DATA_DIR}
       - ${OPENCLAW_DIR}/workspace/skills/knowledge-distill:${OPENCLAW_DIR}/workspace/skills/knowledge-distill
