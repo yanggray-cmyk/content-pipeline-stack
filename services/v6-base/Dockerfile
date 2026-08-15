@@ -26,6 +26,11 @@ LABEL maintainer="main-agent" \
 RUN apt-get update && apt-get install -y --no-install-recommends \
         tini \
         curl \
+        # v285.72 (2026-08-13 20:00 Cove 拍板根治): v6-transcribe worker 需 ffmpeg 抽 wav from mp4/ts
+        # 根因: v6_base.py:extract_wav() 调 subprocess ffmpeg, 但 v6-base Dockerfile 没装
+        #       → v6-transcribe container 报 "ffmpeg: command not found" → transcribe fail in 0.0s
+        # 修复: v6-base base image 装 ffmpeg (共享给 5 worker, v6-transcribe 不用单独装)
+        ffmpeg \
         # 铁律 178 (2026-07-26 03:50 main 反思): chromium 容器化需装系统 lib
         # bookworm-slim 不预装 chrome-headless-shell 依赖 (libglib/libgobject/libnspr/libnss ...)
         libglib2.0-0 \
