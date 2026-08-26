@@ -5,59 +5,6 @@
 
 services:
 
-  # ─── content-pipeline-mcp (MCP protocol layer, 17 tools) ──────────────────
-  content-pipeline-mcp:
-    build:
-      context: ./services/content-pipeline-mcp
-      dockerfile: Dockerfile
-    image: ${REGISTRY_URL:-localhost:5000}/content-pipeline-stack/content-pipeline-mcp:${IMAGE_TAG:-0.1.0}
-    container_name: content-pipeline-mcp
-    restart: unless-stopped
-    ports:
-      - "28092:18092"
-    environment:
-      NODE_ENV: production
-      HOST: "0.0.0.0"
-      # 铁律 192 (Phase 4-ii / 2026-07-28 14:47 Cove 拍 C 方案):
-      # text-distill-service URL + token (供 MCP Tool 8 调 host 上的 HTTP service)
-      TEXT_DISTILL_URL: "http://host.docker.internal:18191/distill"
-      TEXT_DISTILL_TOKEN: ${TEXT_DISTILL_TOKEN:-}
-    env_file:
-      - ./.env
-    # 铁律 192 (Phase 4-ii): 让容器能解析 host.docker.internal 到 host IP
-    # (Linux Docker 27+ 需显式声明 extra_hosts, host-gateway 是 Docker 内置 magic)
-    extra_hosts:
-      - "host.docker.internal:host-gateway"
-    volumes:
-      # Read-only access to pipeline data dir (queue.db, transcripts, cookies)
-      # m11.18.7 (Cove 12:08 反思追问): pipeline_retry_dead 写入 queue.db 报
-      #   'attempt to write a readonly database'. 必须改 :rw 让 tool 能 write
-      - ${DATA_DIR}:${DATA_DIR}:rw
-      # m11.18.7 (Cove 12:08 反思追问触发): 容器内 pgrep 看不到主机 v6 worker
-      # (PID namespace 隔离) → workers_alive_count 永远 0 误报 silent failure
-      # 修: bind mount host /proc 进 container, 让 checkWorkersRunning 用 /proc 看主机进程
-      - /proc:/host_proc:ro
-    deploy:
-      resources:
-        limits:
-          memory: 2G          # 跟 systemd MemoryMax=2G
-          cpus: "1.5"
-        reservations:
-          memory: 1G          # 跟 systemd MemoryHigh=1G
-    healthcheck:
-      test: ["CMD", "wget", "-qO-", "http://127.0.0.1:18092/health"]
-      interval: 30s
-      timeout: 5s
-      retries: 3
-      start_period: 10s
-    logging:
-      driver: json-file
-      options:
-        max-size: "10m"
-        max-file: "3"
-    networks:
-      - content-pipeline-net
-
   # ─── file-service (Node.js video/file browsing + upload) ─────────────────────
   file-service:
     build:
@@ -90,9 +37,9 @@ services:
           cpus: "1.0"
     networks:
       - content-pipeline-net
-    depends_on:
-      - content-pipeline-mcp
-
+    # 铁律 m11.18.8 (2026-08-26 12:41 Cove 拍 A 方案): 删 depends_on content-pipeline-mcp
+    # 修前 (m11.18.7): file-service 假设 mcp 在 docker, 用 content-pipeline-mcp:18092
+    # 修后: mcp 在主机 systemd, file-service 不直接调 mcp (实际无调用), 删依赖
   # ─── douyin-recorder (DouyinLiveRecorder upstream, ffmpeg + nodejs) ─────────
   douyin-recorder:
     profiles: ["v6-workers"]
@@ -119,8 +66,9 @@ services:
           cpus: "1.5"
     networks:
       - content-pipeline-net
-    depends_on:
-      - content-pipeline-mcp
+    # 铁律 m11.18.8 (2026-08-26 12:41 Cove 拍 A 方案): 删 depends_on content-pipeline-mcp
+    # 修前 (m11.18.7): douyin-recorder 假设 mcp 在 docker, 用 content-pipeline-mcp:18092
+    # 修后: mcp 在主机 systemd, douyin-recorder 不直接调 mcp (实际无调用), 删依赖
 
   # ─── v6-monitor (抖音账号监控 daemon, 6h 间隔) ─────────────────────────────
   # 铁律 200.4 (2026-07-28 19:46 Cove 拍板): systemd v6-monitor.service 是真源 (host 进程),
@@ -139,7 +87,9 @@ services:
       V6_WORKDIR: ${DATA_DIR}
       V6_ACCOUNTS_FILE: ${DATA_DIR}/config/accounts.json
       BRAND_VIDEO_ROOT: ${OPENCLAW_DIR}/workspace/skills/brand-video-tools
-      MCP_URL: http://content-pipeline-mcp:18092/mcp
+      # 铁律 m11.18.8 (2026-08-26 12:41 Cove 拍 A 方案): mcp 改 systemd 服务跑主机, 端口 19092
+      # docker 容器调 mcp 用 host.docker.internal (Linux Docker 27+ extra_hosts: host-gateway)
+      MCP_URL: http://host.docker.internal:19092/mcp
       DOUYIN_COOKIE_PATH: ${DATA_DIR}/config/cookies
       TZ: ${TZ:-Asia/Shanghai}
     env_file:
@@ -147,6 +97,10 @@ services:
     volumes:
       - ${DATA_DIR}:${DATA_DIR}
       - ${OPENCLAW_DIR}/workspace/skills/brand-video-tools:${OPENCLAW_DIR}/workspace/skills/brand-video-tools
+    # 铁律 m11.18.8 (2026-08-26 12:41 Cove 拍 A 方案):
+    # mcp 改 systemd 服务跑主机, 容器需 host.docker.internal 才能访问
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
     deploy:
       resources:
         limits:
@@ -154,8 +108,9 @@ services:
           cpus: "0.5"
     networks:
       - content-pipeline-net
-    depends_on:
-      - content-pipeline-mcp
+    # 修前 (m11.18.7): depends_on: content-pipeline-mcp (docker DNS)
+    # 修后 (m11.18.8): mcp 在主机 systemd, 无 docker service 可 depends_on
+    #   v6-monitor 用 host.docker.internal:19092 直连, 不需要 docker depends
 
   # ─── v6-enqueue (cron-driven, sleep infinity + docker compose run --rm) ──────
   v6-enqueue:

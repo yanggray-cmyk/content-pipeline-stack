@@ -1,0 +1,54 @@
+[Unit]
+Description=content-pipeline-mcp (MCP Server, 17 tools, HK localhost:18092)
+# m11.18.8 (2026-08-26 12:41 Cove 拍 A 方案): mcp 改 systemd 服务跑主机
+# 跟 v6 worker 同级, 干掉 docker container (治本)
+# 修前: docker container + bind mount /host_proc + DATA_DIR :rw + process.kill 绕 systemctl
+#       三个 silent failure 都是 docker namespace 隔离的 hack 修复
+# 修后: 跟 v6 worker 一样, systemd 直接跑主机 node, 不用 hack
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=main
+Group=main
+# 跟 docker compose 里 WORKDIR 对齐 (v6 worker 用 douyin-data, mcp 同)
+WorkingDirectory=/home/main/.openclaw/workspace/content-pipeline-stack/services/content-pipeline-mcp
+# 直接跑编译过的 dist/index.js (跟 Dockerfile CMD 一致)
+# tini 在 systemd 下不需要 (systemd 自己管 PID 1)
+ExecStart=/usr/bin/node dist/index.js
+# 跟 v6 worker 同 Restart 配置
+Restart=on-failure
+RestartSec=10
+StartLimitBurst=5
+StartLimitInterval=300
+# 跟 v6 worker 内存配置一致
+MemoryMax=2G
+MemoryHigh=1G
+# 跟 docker compose environment 一致 (mcp src 引用了所有这些)
+EnvironmentFile=/home/main/.openclaw/workspace/content-pipeline-stack/.env
+# mcp 还需要的几个 (默认 .env 没设, 这里硬编码)
+# - NODE_ENV=production (跟 docker 一致)
+# - HOST=127.0.0.1 (systemd 跑主机, 不用 0.0.0.0; nginx 转 28092:18092)
+# - PORT=18092 (跟 docker compose 一致)
+# - HK_ASR_URL=http://localhost:18200 (systemd 跑主机, 不是 host.docker.internal)
+# - FILE_SERVICE_URL=http://localhost:18098 (systemd 跑主机, 不是 file-service:18098)
+# - TEXT_DISTILL_URL=http://localhost:18091/distill (systemd 跑主机, 不是 host.docker.internal)
+# - V6_WORKDIR=/home/main/douyin-data (跟 v6 worker WORKDIR 一致)
+# - YUXI_KB_ID=kb_ftl95bqw46 (m11.18.4 baked-in)
+# - MCP_NO_AUTH=1 (systemd 跑主机, 不用 token 鉴权; 跟生产反向, 但 localhost-only 安全)
+Environment="NODE_ENV=production"
+Environment="HOST=127.0.0.1"
+Environment="PORT=19092"
+Environment="HK_ASR_URL=http://localhost:18200"
+Environment="FILE_SERVICE_URL=http://localhost:18098"
+Environment="TEXT_DISTILL_URL=http://localhost:18091/distill"
+Environment="V6_WORKDIR=/home/main/douyin-data"
+Environment="YUXI_KB_ID=kb_ftl95bqw46"
+Environment="MCP_NO_AUTH=1"
+# 跟 v6 worker log 一致
+StandardOutput=append:/home/main/douyin-data/logs/content-pipeline-mcp.log
+StandardError=append:/home/main/douyin-data/logs/content-pipeline-mcp.log
+
+[Install]
+WantedBy=multi-user.target

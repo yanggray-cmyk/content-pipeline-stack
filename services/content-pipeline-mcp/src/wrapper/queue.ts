@@ -734,18 +734,18 @@ export async function getStuckProcessing(minutes: number = 5): Promise<StuckRow[
 }
 
 /**
- * worker 进程检查 (主机端进程, 不是容器内 pgrep)
+ * worker 进程检查 (主机端进程, 跟 mcp systemd 同 PID namespace)
  *
  * 铁律 162 (2026-07-24 18:26 Cove 拍板): 修 stale "monitor_douyin.py" 检查
  * 修前: pgrep "monitor_douyin.py" 永远 false (老文件 11:42 铁律 152 切换已删)
  * 修后: pgrep "v6_monitor.py" (新 daemon, 跟 systemd service 命名对齐)
  *
- * 铁律 m11.18.7 (2026-08-26 12:08 Cove 反思追问触发):
- * 容器内 pgrep 看不到主机 v6 worker (PID namespace 隔离)
- * → workers_alive_count 永远 0 → 误报 silent failure
- * 修: docker-compose.yml bind mount host /proc 进 container (:/host_proc)
- *    pgrep --nsroot /host_proc/<pid>/ns 看主机 PID namespace
- *    或: 直接读 /host_proc/<pid>/cmdline 找进程名
+ * 铁律 m11.18.8 (2026-08-26 12:41 Cove 拍 A 方案 - 治本):
+ * mcp 改 systemd 服务跑主机, 跟 v6 worker 同 PID namespace
+ * → 简单 pgrep 直接看主机 PID, 不用 docker /host_proc hack
+ * 修前 (m11.18.7 hack): docker container 跑 mcp → namespace 隔离 → pgrep 看不到主机 worker
+ *      → 装 /host_proc bind mount → readdirSync(/host_proc) hack
+ * 修后: mcp systemd 跑主机 → 跟 worker 同 PID → 直接 pgrep
  */
 export function checkWorkersRunning(): Record<string, boolean> {
   const patterns = [
@@ -757,42 +757,16 @@ export function checkWorkersRunning(): Record<string, boolean> {
   ];
   const result: Record<string, boolean> = {};
 
-  // 检查 /host_proc 是否存在 (docker-compose.yml volumes bind mount)
-  const hostProcRoot = "/host_proc";
-  const useHostProc = existsSync(hostProcRoot);
-
   for (const p of patterns) {
-    let found = false;
-    if (useHostProc) {
-      // 主机端扫 /host_proc/*/cmdline 找含 pattern 的进程
-      try {
-        const entries = readdirSync(hostProcRoot);
-        for (const entry of entries) {
-          if (!/^\d+$/.test(entry)) continue;
-          try {
-            const cmdline = readFileSync(`${hostProcRoot}/${entry}/cmdline`, "utf-8");
-            if (cmdline.includes(p)) {
-              found = true;
-              break;
-            }
-          } catch {
-            // 单个进程 cmdline 读不到, 跳过
-          }
-        }
-      } catch {
-        found = false;
-      }
-    } else {
-      // fallback: 容器内 pgrep (跟老逻辑一致, 仍可能有 false negative)
-      try {
-        const out = execFileSync("pgrep", ["-f", "--", p], { encoding: "utf-8" });
-        const lines = out.trim().split("\n").filter(Boolean);
-        found = lines.length > 0;
-      } catch {
-        found = false;
-      }
+    try {
+      // systemd 跑主机后, pgrep 直接看主机 PID namespace
+      const out = execFileSync("pgrep", ["-f", "--", p], { encoding: "utf-8" });
+      const lines = out.trim().split("\n").filter(Boolean);
+      result[p] = lines.length > 0;
+    } catch {
+      // pgrep 返非 0 = 没找到, 不是错误
+      result[p] = false;
     }
-    result[p] = found;
   }
   return result;
 }
