@@ -30,7 +30,9 @@ services:
       - "host.docker.internal:host-gateway"
     volumes:
       # Read-only access to pipeline data dir (queue.db, transcripts, cookies)
-      - ${DATA_DIR}:${DATA_DIR}:ro
+      # m11.18.7 (Cove 12:08 反思追问): pipeline_retry_dead 写入 queue.db 报
+      #   'attempt to write a readonly database'. 必须改 :rw 让 tool 能 write
+      - ${DATA_DIR}:${DATA_DIR}:rw
       # m11.18.7 (Cove 12:08 反思追问触发): 容器内 pgrep 看不到主机 v6 worker
       # (PID namespace 隔离) → workers_alive_count 永远 0 误报 silent failure
       # 修: bind mount host /proc 进 container, 让 checkWorkersRunning 用 /proc 看主机进程

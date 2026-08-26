@@ -31,38 +31,78 @@ const LOG_FILE = "/home/main/douyin-data/logs/v6-monitor.log";
  */
 export function runMonitor(args: string[] = []): Promise<{ stdout: string; stderr: string; code: number }> {
   return new Promise((resolve, reject) => {
-    // 1. 先检查 daemon 是否活着 (is-active)
-    const isActive = spawn("systemctl", ["is-active", MONITOR_SERVICE], {
-      env: { ...process.env },
-    });
-    let isActiveOut = "";
-    isActive.stdout.on("data", (d) => { isActiveOut += d.toString(); });
-    isActive.on("close", (isActiveCode) => {
-      // is-active exit 0=active, 3=inactive/failed, 4=not-found
-      const state = isActiveOut.trim();
-      if (isActiveCode !== 0 || state !== "active") {
-        return reject(new Error(`${MONITOR_SERVICE} is not active (state=${state || "unknown"}, code=${isActiveCode}). Start it first: sudo systemctl start ${MONITOR_SERVICE}`));
+    // 铁律 m11.18.7 (2026-08-26 12:08 Cove 反思追问):
+    // 容器内没 systemctl / sudo, 但要查 daemon 状态
+    // 修: 用 bind mount host /proc, pgrep 主机 v6_monitor.py
+    //     真发 SIGUSR1 用 kill -USR1 <pid> 直接调, 不走 systemctl
+    const hostProcRoot = "/host_proc";
+    const useHostProc = existsSync(hostProcRoot);
+
+    if (useHostProc) {
+      // 主机模式: 扫 /host_proc 找 v6_monitor.py pid, 直接发 SIGUSR1
+      const { readdirSync, readFileSync } = require("node:fs");
+      let monitorPid: number | null = null;
+      try {
+        const entries = readdirSync(hostProcRoot);
+        for (const entry of entries) {
+          if (!/^\d+$/.test(entry)) continue;
+          try {
+            const cmdline = readFileSync(`${hostProcRoot}/${entry}/cmdline`, "utf-8");
+            if (cmdline.includes("v6_monitor.py")) {
+              monitorPid = parseInt(entry, 10);
+              break;
+            }
+          } catch { /* skip */ }
+        }
+      } catch (e: any) {
+        return reject(new Error(`read /host_proc failed: ${e.message}. (mcp container must bind-mount host /proc)`));
       }
-      // 2. Daemon alive → 发 SIGUSR1 (需要 sudo: signal 跨 user 需 root)
-      const sig = spawn("sudo", ["-n", "systemctl", "kill", "-s", "USR1", MONITOR_SERVICE], {
+      if (monitorPid === null) {
+        return reject(new Error(`v6_monitor.py daemon not running (no pid in /host_proc). Start it: sudo systemctl start v6-monitor.service`));
+      }
+      // 发 SIGUSR1 直接给 pid (kill 在 container 内调 host kernel 是 OK 的)
+      try {
+        process.kill(monitorPid, "SIGUSR1");
+      } catch (e: any) {
+        return reject(new Error(`process.kill(${monitorPid}, SIGUSR1) failed: ${e.message}`));
+      }
+      // Wait for daemon to run the check and write logs
+      const waitMs = args.includes("--once") ? 30_000 : 30_000;
+      setTimeout(() => {
+        const log = readMonitorLog(40);
+        resolve({ stdout: log, stderr: "", code: 0 });
+      }, waitMs);
+    } else {
+      // fallback: 容器内 systemctl (老逻辑, 跟 sqlite3 ENOENT 同款问题, 但保留兼容)
+      const isActive = spawn("systemctl", ["is-active", MONITOR_SERVICE], {
         env: { ...process.env },
       });
-      let sigErr = "";
-      sig.stderr.on("data", (d) => { sigErr += d.toString(); });
-      sig.on("error", reject);
-      sig.on("close", (code) => {
-        if (code !== 0) {
-          return reject(new Error(`systemctl kill SIGUSR1 failed (code=${code}): ${sigErr.trim()}`));
+      let isActiveOut = "";
+      isActive.stdout.on("data", (d) => { isActiveOut += d.toString(); });
+      isActive.on("close", (isActiveCode) => {
+        const state = isActiveOut.trim();
+        if (isActiveCode !== 0 || state !== "active") {
+          return reject(new Error(`${MONITOR_SERVICE} is not active (state=${state || "unknown"}, code=${isActiveCode}). Start it first: sudo systemctl start ${MONITOR_SERVICE}`));
         }
-        // Wait for daemon to run the check and write logs (~20s is enough for incremental, ~120s for full fetch)
-        const waitMs = args.includes("--once") ? 30_000 : 30_000;  // MCP --once 模式
-        setTimeout(() => {
-          const log = readMonitorLog(40);
-          resolve({ stdout: log, stderr: "", code: code ?? 0 });
-        }, waitMs);
+        const sig = spawn("sudo", ["-n", "systemctl", "kill", "-s", "USR1", MONITOR_SERVICE], {
+          env: { ...process.env },
+        });
+        let sigErr = "";
+        sig.stderr.on("data", (d) => { sigErr += d.toString(); });
+        sig.on("error", reject);
+        sig.on("close", (code) => {
+          if (code !== 0) {
+            return reject(new Error(`systemctl kill SIGUSR1 failed (code=${code}): ${sigErr.trim()}`));
+          }
+          const waitMs = args.includes("--once") ? 30_000 : 30_000;
+          setTimeout(() => {
+            const log = readMonitorLog(40);
+            resolve({ stdout: log, stderr: "", code: code ?? 0 });
+          }, waitMs);
+        });
       });
-    });
-    isActive.on("error", reject);
+      isActive.on("error", reject);
+    }
   });
 }
 
