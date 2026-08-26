@@ -734,11 +734,18 @@ export async function getStuckProcessing(minutes: number = 5): Promise<StuckRow[
 }
 
 /**
- * worker 进程检查 (pgrep, 跟之前一致)
+ * worker 进程检查 (主机端进程, 不是容器内 pgrep)
  *
  * 铁律 162 (2026-07-24 18:26 Cove 拍板): 修 stale "monitor_douyin.py" 检查
  * 修前: pgrep "monitor_douyin.py" 永远 false (老文件 11:42 铁律 152 切换已删)
  * 修后: pgrep "v6_monitor.py" (新 daemon, 跟 systemd service 命名对齐)
+ *
+ * 铁律 m11.18.7 (2026-08-26 12:08 Cove 反思追问触发):
+ * 容器内 pgrep 看不到主机 v6 worker (PID namespace 隔离)
+ * → workers_alive_count 永远 0 → 误报 silent failure
+ * 修: docker-compose.yml bind mount host /proc 进 container (:/host_proc)
+ *    pgrep --nsroot /host_proc/<pid>/ns 看主机 PID namespace
+ *    或: 直接读 /host_proc/<pid>/cmdline 找进程名
  */
 export function checkWorkersRunning(): Record<string, boolean> {
   const patterns = [
@@ -749,14 +756,43 @@ export function checkWorkersRunning(): Record<string, boolean> {
     "v6_monitor.py",  // 铁律 162: 老 monitor_douyin.py 已废弃, 用 v6_monitor.py
   ];
   const result: Record<string, boolean> = {};
+
+  // 检查 /host_proc 是否存在 (docker-compose.yml volumes bind mount)
+  const hostProcRoot = "/host_proc";
+  const useHostProc = existsSync(hostProcRoot);
+
   for (const p of patterns) {
-    try {
-      const out = execFileSync("pgrep", ["-f", "--", p], { encoding: "utf-8" });
-      const lines = out.trim().split("\n").filter(Boolean);
-      result[p] = lines.length > 0;
-    } catch {
-      result[p] = false;
+    let found = false;
+    if (useHostProc) {
+      // 主机端扫 /host_proc/*/cmdline 找含 pattern 的进程
+      try {
+        const entries = readdirSync(hostProcRoot);
+        for (const entry of entries) {
+          if (!/^\d+$/.test(entry)) continue;
+          try {
+            const cmdline = readFileSync(`${hostProcRoot}/${entry}/cmdline`, "utf-8");
+            if (cmdline.includes(p)) {
+              found = true;
+              break;
+            }
+          } catch {
+            // 单个进程 cmdline 读不到, 跳过
+          }
+        }
+      } catch {
+        found = false;
+      }
+    } else {
+      // fallback: 容器内 pgrep (跟老逻辑一致, 仍可能有 false negative)
+      try {
+        const out = execFileSync("pgrep", ["-f", "--", p], { encoding: "utf-8" });
+        const lines = out.trim().split("\n").filter(Boolean);
+        found = lines.length > 0;
+      } catch {
+        found = false;
+      }
     }
+    result[p] = found;
   }
   return result;
 }
