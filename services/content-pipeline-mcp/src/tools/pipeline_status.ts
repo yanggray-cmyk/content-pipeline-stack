@@ -5,7 +5,7 @@
  *
  * 配置 (EX-P2-X + P1-3 + 铁律 138): WORKDIR / kb_id / 凭据 全部从环境变量读
  *   - V6_WORKDIR (默认 /home/main/douyin-data — 铁律 138 WORKDIR 一致 2026-07-22 Cove P0)
- *   - YUXI_KB_ID (默认 kb_nmii38ind3)
+ *   - YUXI_KB_ID (默认 kb_ftl95bqw46)
  *   - YUXI_USERNAME / YUXI_PASSWORD (P1-2: 替代硬编码 admin:admin123)
  */
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
@@ -17,7 +17,7 @@ import { readdirSync } from "node:fs";
 
 // 铁律 138 WORKDIR 一致 (2026-07-22 Cove P0): 修前 /home/main/douyin-data/batch_v5_daya_1467 → 错路径
 const WORKDIR = process.env.V6_WORKDIR || "/home/main/douyin-data";
-const YUXI_KB_ID = process.env.YUXI_KB_ID || "kb_nmii38ind3";
+const YUXI_KB_ID = process.env.YUXI_KB_ID || "kb_ftl95bqw46";
 const YUXI_USERNAME = process.env.YUXI_USERNAME || "admin";
 const YUXI_PASSWORD = process.env.YUXI_PASSWORD || "";
 

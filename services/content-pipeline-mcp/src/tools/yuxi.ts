@@ -34,7 +34,7 @@ function buildDefaultConfig(): YuxiConfig {
     base_url: process.env.YUXI_BASE_URL || "https://hz.siqing.cn/yuxi",
     username: process.env.YUXI_USERNAME || "admin",
     password,
-    kb_id: process.env.YUXI_KB_ID || "kb_nmii38ind3",
+    kb_id: process.env.YUXI_KB_ID || "kb_ftl95bqw46",
   };
 }
 

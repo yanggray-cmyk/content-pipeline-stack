@@ -38,7 +38,8 @@ LABEL org.opencontainers.image.source="https://github.com/main-1/content-pipelin
 LABEL org.opencontainers.image.version="0.1.0"
 
 # Install wget for healthcheck (no curl in alpine by default)
-RUN apk add --no-cache wget tini
+# m11.18.6 (Cove 2026-08-26 11:24 拍板 A): 加 sqlite3, 18 MCP tool 全部 spawn('sqlite3', ...) 修 ENOENT 4 weeks silent failure
+RUN apk add --no-cache wget tini sqlite
 
 # Create non-root user (Alpine node:24-alpine already has 'node' user; we use it)
 # Note: alpine's node user has uid 1000 by default; we don't re-create to avoid gid clash
